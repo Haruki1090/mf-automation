@@ -36,6 +36,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      actions: write
 
     steps:
       - name: コードチェックアウト
@@ -55,6 +56,13 @@ jobs:
 
       - name: Playwright Chromium インストール
         run: python -m playwright install chromium --with-deps
+
+      - name: セッションキャッシュ復元
+        uses: actions/cache/restore@v4
+        with:
+          path: scraper/session.json
+          key: mf-session-${{ github.run_id }}
+          restore-keys: mf-session-
 
       - name: スクレイピング実行
         env:
@@ -77,3 +85,10 @@ jobs:
           [ -n "${SCRAPE_TO}" ] && ARGS="${ARGS} --to ${SCRAPE_TO}"
           [ -n "${JOB_PAGE_ID}" ] && ARGS="${ARGS} --job-page-id ${JOB_PAGE_ID}"
           python scraper/main.py ${ARGS}
+
+      - name: セッションキャッシュ保存
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: scraper/session.json
+          key: mf-session-${{ github.run_id }}

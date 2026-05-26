@@ -136,11 +136,13 @@ class MoneyForwardScraper:
 
     def _new_context(self, browser) -> BrowserContext:
         kwargs = dict(
+            locale="ja-JP",
+            timezone_id="Asia/Tokyo",
             user_agent=(
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/124.0.0.0 Safari/537.36"
-            )
+            ),
         )
         if SESSION_FILE.exists():
             print("[Session] 保存済みセッションを読み込みます...")
