@@ -60,7 +60,7 @@ jobs:
           NOTION_DB_ID: ${{ secrets.NOTION_DB_ID }}
           GAS_OTP_URL: ${{ secrets.GAS_OTP_URL }}
           GAS_OTP_SECRET: ${{ secrets.GAS_OTP_SECRET }}
-          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ACTIONS_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SCRAPE_MODE: ${{ github.event.client_payload.mode || inputs.mode || 'current_month' }}
           SCRAPE_MONTH: ${{ github.event.client_payload.month || inputs.month || '' }}
           SCRAPE_FROM: ${{ github.event.client_payload.from_date || inputs.from_date || '' }}

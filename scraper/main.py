@@ -176,7 +176,7 @@ def main():
                 取引件数=len(result.transactions),
                 残高件数=len(result.balances),
                 取得期間=str(date_range),
-                GitHub実行URL=os.getenv("GITHUB_RUN_URL", ""),
+                GitHub実行URL=os.getenv("ACTIONS_RUN_URL", ""),
             )
             print(f"[Notion] ジョブページを完了に更新しました: {job_page_id}")
 
@@ -189,7 +189,7 @@ def main():
                 状態="エラー",
                 完了日時=datetime.utcnow().isoformat() + "Z",
                 エラー詳細=str(e),
-                GitHub実行URL=os.getenv("GITHUB_RUN_URL", ""),
+                GitHub実行URL=os.getenv("ACTIONS_RUN_URL", ""),
             )
             print(f"[Notion] ジョブページをエラーに更新しました: {job_page_id}")
         sys.exit(1)
