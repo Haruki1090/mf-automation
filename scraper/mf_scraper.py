@@ -303,14 +303,32 @@ class MoneyForwardScraper:
             print(f"[Login] アカウント選択処理スキップ: {e}")
 
     @staticmethod
-    def _parse_transaction_date(date_text: str) -> Optional[date]:
+    def _parse_transaction_date(
+        date_text: str,
+        default_year: Optional[int] = None,
+        date_range: Optional[DateRange] = None,
+    ) -> Optional[date]:
         """明細の日付文字列を date オブジェクトに変換。パース失敗時は None を返す。"""
         m = re.match(r"(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})", date_text)
         if m:
             return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
         m = re.match(r"(\d{1,2})[/\-](\d{1,2})", date_text)
         if m:
-            return date(date.today().year, int(m.group(1)), int(m.group(2)))
+            month = int(m.group(1))
+            day = int(m.group(2))
+            if date_range:
+                years = list(dict.fromkeys([date_range.start.year, date_range.end.year]))
+                for year in years:
+                    try:
+                        candidate = date(year, month, day)
+                    except ValueError:
+                        return None
+                    if date_range.start <= candidate <= date_range.end:
+                        return candidate
+            try:
+                return date(default_year or date.today().year, month, day)
+            except ValueError:
+                return None
         return None
 
     def _scrape_transactions(self, page: Page, date_range: DateRange, max_pages: int = 10) -> list[Transaction]:
@@ -353,7 +371,7 @@ class MoneyForwardScraper:
                     if not amount_text or not date_text:
                         continue
 
-                    tx_date = self._parse_transaction_date(date_text)
+                    tx_date = self._parse_transaction_date(date_text, date_range=date_range)
                     if tx_date is not None:
                         if oldest_in_page is None or tx_date < oldest_in_page:
                             oldest_in_page = tx_date
@@ -361,7 +379,7 @@ class MoneyForwardScraper:
                             continue
 
                     transactions.append(Transaction(
-                        date=date_text,
+                        date=tx_date.isoformat() if tx_date else date_text,
                         amount=int(amount_text),
                         category=category,
                         sub_category=sub_category,

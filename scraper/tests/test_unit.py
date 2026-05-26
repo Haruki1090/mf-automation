@@ -12,6 +12,7 @@ import pytest
 from mf_scraper import (
     DateRange,
     MoneyForwardScraper,
+    Transaction,
     range_current_month,
     range_last_month,
     range_specific_month,
@@ -19,6 +20,7 @@ from mf_scraper import (
     range_last_week,
 )
 from notion_writer import NotionWriter
+from main import ensure_notion_write_succeeded
 
 
 # ---------------------------------------------------------------------------
@@ -33,6 +35,68 @@ class TestDateRange:
     def test_str_format(self):
         dr = DateRange(start=date(2026, 4, 1), end=date(2026, 4, 30))
         assert str(dr) == "2026-04-01 〜 2026-04-30"
+
+
+# ---------------------------------------------------------------------------
+# Notion書き込み結果
+# ---------------------------------------------------------------------------
+
+class TestNotionWriteResult:
+    def test_success_when_no_errors(self):
+        ensure_notion_write_succeeded({"created": 3, "updated": 2, "errors": 0})
+
+    def test_raises_when_errors_exist(self):
+        with pytest.raises(RuntimeError, match="errors=1"):
+            ensure_notion_write_succeeded({"created": 3, "updated": 2, "errors": 1})
+
+
+class TestNotionDatabaseValidation:
+    @staticmethod
+    def database_with_properties(**types: str) -> dict:
+        return {"properties": {name: {"type": prop_type} for name, prop_type in types.items()}}
+
+    def test_accepts_required_transaction_schema(self):
+        db = self.database_with_properties(**NotionWriter.REQUIRED_TRANSACTION_PROPERTIES)
+        NotionWriter._validate_database_properties(db)
+
+    def test_requires_job_id_when_worker_job_is_used(self):
+        db = self.database_with_properties(**NotionWriter.REQUIRED_TRANSACTION_PROPERTIES)
+        with pytest.raises(RuntimeError, match="ジョブID"):
+            NotionWriter._validate_database_properties(db, include_job_page_id=True)
+
+    def test_rejects_wrong_property_type(self):
+        props = dict(NotionWriter.REQUIRED_TRANSACTION_PROPERTIES)
+        props["金額"] = "rich_text"
+        db = self.database_with_properties(**props)
+        with pytest.raises(RuntimeError, match="金額"):
+            NotionWriter._validate_database_properties(db)
+
+
+class TestAccountNormalization:
+    def test_normalizes_vpass_account_to_ana_card(self):
+        assert NotionWriter.normalize_account("三井住友カード (VpassID)") == "ANAカード"
+
+    def test_normalizes_fullwidth_vpass_account_to_ana_card(self):
+        assert NotionWriter.normalize_account("三井住友カード（VPassID）") == "ANAカード"
+
+    def test_keeps_non_alias_account(self):
+        assert NotionWriter.normalize_account("住信SBIネット銀行") == "住信SBIネット銀行"
+
+    def test_account_filter_matches_new_and_legacy_names(self):
+        tx = Transaction(
+            date="2026-05-01",
+            amount=-100,
+            category="食費",
+            sub_category="外食",
+            account="三井住友カード (VpassID)",
+            memo="test",
+        )
+        assert NotionWriter._account_filter(tx) == {
+            "or": [
+                {"property": "口座", "select": {"equals": "ANAカード"}},
+                {"property": "口座", "select": {"equals": "三井住友カード (VpassID)"}},
+            ]
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +254,18 @@ class TestParseTransactionDate:
     def test_month_day_no_weekday(self):
         result = MoneyForwardScraper._parse_transaction_date("05/01")
         assert result == date(date.today().year, 5, 1)
+
+    def test_month_day_uses_date_range_year(self):
+        dr = DateRange(start=date(2025, 12, 1), end=date(2025, 12, 31))
+        result = MoneyForwardScraper._parse_transaction_date("12/15(月)", date_range=dr)
+        assert result == date(2025, 12, 15)
+
+    def test_month_day_resolves_cross_year_range(self):
+        dr = DateRange(start=date(2025, 12, 29), end=date(2026, 1, 4))
+        dec_result = MoneyForwardScraper._parse_transaction_date("12/31(水)", date_range=dr)
+        jan_result = MoneyForwardScraper._parse_transaction_date("01/01(木)", date_range=dr)
+        assert dec_result == date(2025, 12, 31)
+        assert jan_result == date(2026, 1, 1)
 
     def test_single_digit(self):
         result = MoneyForwardScraper._parse_transaction_date("1/3")

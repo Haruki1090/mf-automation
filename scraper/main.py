@@ -106,6 +106,17 @@ def save_csv(result: ScrapingResult, date_range: DateRange) -> tuple[Path, Path]
     return tx_path, bal_path
 
 
+def ensure_notion_write_succeeded(write_result: dict) -> None:
+    errors = int(write_result.get("errors", 0))
+    if errors:
+        created = int(write_result.get("created", 0))
+        updated = int(write_result.get("updated", 0))
+        raise RuntimeError(
+            "Notion書き込みでエラーが発生しました: "
+            f"created={created}, updated={updated}, errors={errors}"
+        )
+
+
 def main():
     args = parse_args()
 
@@ -117,6 +128,7 @@ def main():
 
     date_range = resolve_date_range(args)
     token = os.getenv("NOTION_TOKEN")
+    db_id = os.getenv("NOTION_DB_ID")
     job_page_id: str | None = args.job_page_id or None
     job_updater = NotionJobUpdater(token=token) if (token and job_page_id) else None
 
@@ -127,6 +139,13 @@ def main():
     print("=" * 50)
 
     try:
+        writer = None
+        if token and db_id:
+            print("[Notion] DBアクセスとスキーマを検証します...")
+            writer = NotionWriter(token=token, db_id=db_id)
+            writer.validate_database(include_job_page_id=bool(job_page_id))
+            print("[Notion] DB検証OK")
+
         scraper = MoneyForwardScraper(
             email=email,
             password=password,
@@ -153,17 +172,15 @@ def main():
         print(json.dumps(preview, ensure_ascii=False, indent=2))
 
         # Notion 書き込み（NOTION_TOKEN と NOTION_DB_ID が設定されている場合のみ）
-        db_id = os.getenv("NOTION_DB_ID")
-
-        if token and db_id:
+        if writer:
             print("\n--- Notion ステージングDBへの書き込みを開始します ---")
-            writer = NotionWriter(token=token, db_id=db_id)
             write_result = writer.upsert_transactions(
                 result.transactions,
                 scraped_at=result.scraped_at,
                 job_page_id=job_page_id,
             )
             print(f"書き込み結果: {write_result}")
+            ensure_notion_write_succeeded(write_result)
         else:
             print("\n--- Notion設定なし: CSV のみ出力しました ---")
 

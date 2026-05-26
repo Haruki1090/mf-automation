@@ -61,12 +61,51 @@ MF_PASSWORD=your_password
 
 # Notion（オプション：Notion への書き込みが不要なら空欄でも可）
 NOTION_TOKEN=secret_xxxxxxxxxxxxxxxxxxxx
-NOTION_DB_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+NOTION_DB_ID=f783b354507648b697a2fecd0a10aaa8
+MF_JOB_DB_ID=6b5a9b79d2564d3ca68d952de27c9103
 
 # GAS OTP 自動取得（オプション：設定しなければ手動入力にフォールバック）
 GAS_OTP_URL=https://script.google.com/macros/s/xxxxxxxxxx/exec
 GAS_OTP_SECRET=your_secret_token
 ```
+
+### 3. Notion 取引DBの準備
+
+対象DBは以下です。
+
+| 用途 | DB名 | 環境変数 | DB ID |
+|------|------|----------|-------|
+| 取引保存 | MF_取引履歴 | `NOTION_DB_ID` | `f783b354507648b697a2fecd0a10aaa8` |
+| Workerジョブ履歴 | ジョブ実行履歴 | `MF_JOB_DB_ID` | `6b5a9b79d2564d3ca68d952de27c9103` |
+
+Notion に書き込む場合は、`NOTION_TOKEN` のIntegrationに `MF_取引履歴` DBを共有してください。  
+Workerからジョブページを作成する場合は、WorkerのNotion Integrationに `ジョブ実行履歴` DBも共有してください。  
+現状仕様では、NotionにUpsertする対象は入出金明細のみです。口座残高はCSVに出力します。
+
+取引DBには以下のプロパティが必要です。
+
+| プロパティ | 型 |
+|-----------|----|
+| メモ | Title |
+| 取引日 | Date |
+| 金額 | Number |
+| カテゴリ | Select |
+| サブカテゴリ | Select |
+| 口座 | Select |
+| 収支 | Select |
+| スクレイプ日時 | Date |
+| ジョブID | Text / Rich text |
+
+`--job-page-id` を指定するWorker経由実行では `ジョブID` も必須です。  
+実行前にDBアクセス権とプロパティ型を検証し、不足があればスクレイピング前に停止します。
+
+口座名はNotion保存時に一部正規化します。
+
+| MF上の口座名 | Notion保存名 |
+|-------------|--------------|
+| 三井住友カード (VpassID) / 三井住友カード（VPassID） | ANAカード |
+
+`口座` Selectには `ANAカード` も追加してください。
 
 ---
 
