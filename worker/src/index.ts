@@ -64,6 +64,15 @@ worker.tool("mf-trigger-scraping", {
 
   execute: async (rawInput, { notion }) => {
     const input = rawInput as TriggerInput;
+    const validationError = validateTriggerInput(input);
+    if (validationError) {
+      return {
+        status: "error",
+        job_page_id: "",
+        message: validationError,
+      };
+    }
+
     const jobDbId = process.env.MF_JOB_DB_ID;
     const ghPat = process.env.GH_PAT;
     const ghRepo = process.env.GH_REPO ?? "Haruki1090/mf-automation";
@@ -170,4 +179,55 @@ function modeLabel(input: TriggerInput): string {
     case "month":         return `指定月: ${input.month ?? ""}`;
     case "range":         return `${input.from_date ?? ""} 〜 ${input.to_date ?? ""}`;
   }
+}
+
+function validateTriggerInput(input: TriggerInput): string | null {
+  if (input.mode === "month") {
+    if (!input.month) {
+      return "mode=month では month を YYYY-MM 形式で指定してください";
+    }
+    if (!/^\d{4}-\d{2}$/.test(input.month)) {
+      return "month は YYYY-MM 形式で指定してください";
+    }
+    const month = Number(input.month.slice(5, 7));
+    if (month < 1 || month > 12) {
+      return "month の月は 01〜12 の範囲で指定してください";
+    }
+  }
+
+  if (input.mode === "range") {
+    if (!input.from_date || !input.to_date) {
+      return "mode=range では from_date と to_date を YYYY-MM-DD 形式で指定してください";
+    }
+    const fromDate = parseIsoDate(input.from_date);
+    const toDate = parseIsoDate(input.to_date);
+    if (!fromDate || !toDate) {
+      return "from_date と to_date は YYYY-MM-DD 形式で指定してください";
+    }
+    if (fromDate.getTime() > toDate.getTime()) {
+      return "from_date は to_date 以前の日付を指定してください";
+    }
+  }
+
+  return null;
+}
+
+function parseIsoDate(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsed;
 }
