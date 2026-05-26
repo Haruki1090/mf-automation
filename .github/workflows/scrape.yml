@@ -9,7 +9,7 @@ on:
     inputs:
       mode:
         description: '日付モード'
-        required: false
+        required: true
         default: 'current_month'
         type: choice
         options:
