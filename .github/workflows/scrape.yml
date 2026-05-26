@@ -40,6 +40,8 @@ jobs:
     steps:
       - name: コードチェックアウト
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Python 3.11 セットアップ
         uses: actions/setup-python@v5
