@@ -1,0 +1,4 @@
+[tool.pytest.ini_options]
+pythonpath = ["scraper"]
+testpaths  = ["scraper/tests"]
+addopts    = "-v"
