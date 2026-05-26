@@ -19,7 +19,7 @@ from mf_scraper import (
     range_this_week,
     range_last_week,
 )
-from notion_writer import NotionWriter
+from notion_writer import NotionWriter, NotionJobUpdater
 from main import ensure_notion_write_succeeded
 
 
@@ -70,6 +70,66 @@ class TestNotionDatabaseValidation:
         db = self.database_with_properties(**props)
         with pytest.raises(RuntimeError, match="金額"):
             NotionWriter._validate_database_properties(db)
+
+
+class FakePagesClient:
+    def __init__(self, properties: dict):
+        self.properties = properties
+        self.updated_properties = None
+
+    def retrieve(self, page_id: str) -> dict:
+        return {"properties": self.properties}
+
+    def update(self, page_id: str, properties: dict) -> None:
+        self.updated_properties = properties
+
+
+class FakeNotionClient:
+    def __init__(self, properties: dict):
+        self.pages = FakePagesClient(properties)
+
+
+class TestNotionJobUpdater:
+    @staticmethod
+    def updater_with_properties(**types: str) -> NotionJobUpdater:
+        updater = NotionJobUpdater.__new__(NotionJobUpdater)
+        updater.client = FakeNotionClient({
+            name: {"type": prop_type}
+            for name, prop_type in types.items()
+        })
+        updater._property_cache = {}
+        return updater
+
+    def test_updates_only_existing_job_properties(self):
+        updater = self.updater_with_properties(
+            状態="select",
+            進捗="rich_text",
+            取引件数="number",
+            最終更新日時="date",
+        )
+
+        updater.update(
+            "job-page-id",
+            状態="実行中",
+            進捗="明細取得中",
+            取引件数=12,
+            残高件数=3,
+            最終更新日時="2026-05-27T00:00:00Z",
+        )
+
+        assert updater.client.pages.updated_properties == {
+            "状態": {"select": {"name": "実行中"}},
+            "取引件数": {"number": 12},
+            "進捗": {"rich_text": [{"text": {"content": "明細取得中"}}]},
+            "最終更新日時": {"date": {"start": "2026-05-27T00:00:00Z"}},
+        }
+
+    def test_skips_when_property_type_does_not_match(self):
+        updater = self.updater_with_properties(取引件数="rich_text")
+
+        updater.update("job-page-id", 取引件数=12)
+
+        assert updater.client.pages.updated_properties is None
 
 
 class TestAccountNormalization:

@@ -11,7 +11,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 from playwright.sync_api import sync_playwright, Page, BrowserContext, TimeoutError as PlaywrightTimeoutError
 
 SESSION_FILE = Path(__file__).parent / "session.json"
@@ -55,6 +55,9 @@ class DateRange:
 
     def __str__(self) -> str:
         return f"{self.start} 〜 {self.end}"
+
+
+ProgressCallback = Callable[[dict], None]
 
 
 # ---------------------------------------------------------------------------
@@ -110,12 +113,14 @@ class MoneyForwardScraper:
         headless: bool = False,
         gas_otp_url: Optional[str] = None,
         gas_otp_secret: Optional[str] = None,
+        progress_callback: Optional[ProgressCallback] = None,
     ):
         self.email = email
         self.password = password
         self.headless = headless
         self.gas_otp_url = gas_otp_url
         self.gas_otp_secret = gas_otp_secret
+        self.progress_callback = progress_callback
 
     def scrape(self, date_range: Optional[DateRange] = None) -> ScrapingResult:
         if date_range is None:
@@ -127,12 +132,33 @@ class MoneyForwardScraper:
             context = self._new_context(browser)
             page = context.new_page()
             try:
+                self._emit_progress(stage="login", message="MoneyForwardログイン/セッション確認中")
                 self._ensure_logged_in(page, context)
+                self._emit_progress(stage="transactions", message="入出金明細を取得中", transactions_count=0)
                 transactions = self._scrape_transactions(page, date_range)
+                self._emit_progress(
+                    stage="balances",
+                    message="口座残高を取得中",
+                    transactions_count=len(transactions),
+                )
                 balances = self._scrape_balances(page)
+                self._emit_progress(
+                    stage="scraped",
+                    message="MoneyForwardからの取得が完了",
+                    transactions_count=len(transactions),
+                    balances_count=len(balances),
+                )
                 return ScrapingResult(transactions=transactions, balances=balances)
             finally:
                 browser.close()
+
+    def _emit_progress(self, **event) -> None:
+        if not self.progress_callback:
+            return
+        try:
+            self.progress_callback(event)
+        except Exception as e:
+            print(f"[Scraper] 進捗通知をスキップしました: {e}")
 
     def _new_context(self, browser) -> BrowserContext:
         kwargs = dict(
@@ -353,6 +379,7 @@ class MoneyForwardScraper:
                 break
 
             oldest_in_page: Optional[date] = None
+            page_transactions = 0
 
             for row in rows:
                 cols = row.query_selector_all("td")
@@ -386,9 +413,17 @@ class MoneyForwardScraper:
                         account=account,
                         memo=content,
                     ))
+                    page_transactions += 1
                 except (ValueError, IndexError) as e:
                     print(f"[CF] 行パースエラー: {e}")
                     continue
+
+            self._emit_progress(
+                stage="transactions",
+                message=f"入出金明細ページ {page_num} を取得中",
+                transactions_count=len(transactions),
+                page_transactions_count=page_transactions,
+            )
 
             # このページの最古日が期間開始より前 → 以降のページに対象データなし
             if oldest_in_page is not None and oldest_in_page < date_range.start:
@@ -431,4 +466,9 @@ class MoneyForwardScraper:
                 continue
 
         print(f"[Assets] 取得口座数: {len(balances)}")
+        self._emit_progress(
+            stage="balances",
+            message="口座残高を取得済み",
+            balances_count=len(balances),
+        )
         return balances

@@ -6,9 +6,11 @@ Notion API への書き込み（Upsert）
 import re
 import time
 from datetime import datetime
-from typing import Optional
+from typing import Callable, Optional
 from notion_client import Client
-from mf_scraper import Transaction, AssetBalance, ScrapingResult, DateRange
+from mf_scraper import Transaction
+
+ProgressCallback = Callable[[dict], None]
 
 
 class NotionWriter:
@@ -70,13 +72,27 @@ class NotionWriter:
         transactions: list[Transaction],
         scraped_at: Optional[str] = None,
         job_page_id: Optional[str] = None,
+        progress_callback: Optional[ProgressCallback] = None,
+        progress_interval: int = 5,
     ) -> dict:
         """取引データをUpsert（作成 or 更新）する"""
         created = 0
         updated = 0
         errors = 0
 
-        for tx in transactions:
+        total = len(transactions)
+        self._emit_progress(
+            progress_callback,
+            stage="notion_upsert",
+            message="Notion取引DBへ書き込み中",
+            total_count=total,
+            processed_count=0,
+            created_count=created,
+            updated_count=updated,
+            error_count=errors,
+        )
+
+        for index, tx in enumerate(transactions, start=1):
             try:
                 existing = self._find_existing(tx)
                 if existing:
@@ -91,9 +107,30 @@ class NotionWriter:
                 print(f"[Notion] エラー: {tx.date} {tx.amount}円 - {e}")
                 errors += 1
 
+            if index == total or index % max(progress_interval, 1) == 0:
+                self._emit_progress(
+                    progress_callback,
+                    stage="notion_upsert",
+                    message=f"Notion取引DBへ書き込み中 ({index}/{total})",
+                    total_count=total,
+                    processed_count=index,
+                    created_count=created,
+                    updated_count=updated,
+                    error_count=errors,
+                )
+
         result = {"created": created, "updated": updated, "errors": errors}
         print(f"[Notion] Upsert完了: {result}")
         return result
+
+    @staticmethod
+    def _emit_progress(progress_callback: Optional[ProgressCallback], **event) -> None:
+        if not progress_callback:
+            return
+        try:
+            progress_callback(event)
+        except Exception as e:
+            print(f"[Notion] 進捗通知をスキップしました: {e}")
 
     def _find_existing(self, tx: Transaction) -> Optional[dict]:
         """ユニークキー（取引日 + 金額 + 口座名）で既存ページを検索"""
@@ -200,23 +237,71 @@ class NotionWriter:
 class NotionJobUpdater:
     """ジョブ実行履歴ページのステータスを更新する"""
 
+    PROP_TYPES = {
+        "状態": "select",
+        "完了日時": "date",
+        "取引件数": "number",
+        "残高件数": "number",
+        "取得期間": "rich_text",
+        "GitHub実行URL": "url",
+        "エラー詳細": "rich_text",
+        "進捗": "rich_text",
+        "最終更新日時": "date",
+        "処理済み件数": "number",
+        "作成件数": "number",
+        "更新件数": "number",
+        "エラー件数": "number",
+    }
+
     def __init__(self, token: str):
         self.client = Client(auth=token)
+        self._property_cache: dict[str, dict[str, str]] = {}
 
     def update(self, job_page_id: str, **props) -> None:
+        available_properties = self._available_properties(job_page_id)
         notion_props: dict = {}
-        if "状態" in props:
+        if self._can_update(available_properties, "状態", props):
             notion_props["状態"] = {"select": {"name": props["状態"]}}
-        if "完了日時" in props:
+        if self._can_update(available_properties, "完了日時", props):
             notion_props["完了日時"] = {"date": {"start": props["完了日時"]}}
-        if "取引件数" in props:
+        if self._can_update(available_properties, "取引件数", props):
             notion_props["取引件数"] = {"number": props["取引件数"]}
-        if "残高件数" in props:
+        if self._can_update(available_properties, "残高件数", props):
             notion_props["残高件数"] = {"number": props["残高件数"]}
-        if "取得期間" in props:
+        if self._can_update(available_properties, "取得期間", props):
             notion_props["取得期間"] = {"rich_text": [{"text": {"content": props["取得期間"]}}]}
-        if "GitHub実行URL" in props:
+        if self._can_update(available_properties, "GitHub実行URL", props):
             notion_props["GitHub実行URL"] = {"url": props["GitHub実行URL"]}
-        if "エラー詳細" in props:
+        if self._can_update(available_properties, "エラー詳細", props):
             notion_props["エラー詳細"] = {"rich_text": [{"text": {"content": str(props["エラー詳細"])[:2000]}}]}
+        if self._can_update(available_properties, "進捗", props):
+            notion_props["進捗"] = {"rich_text": [{"text": {"content": str(props["進捗"])[:2000]}}]}
+        if self._can_update(available_properties, "最終更新日時", props):
+            notion_props["最終更新日時"] = {"date": {"start": props["最終更新日時"]}}
+        if self._can_update(available_properties, "処理済み件数", props):
+            notion_props["処理済み件数"] = {"number": props["処理済み件数"]}
+        if self._can_update(available_properties, "作成件数", props):
+            notion_props["作成件数"] = {"number": props["作成件数"]}
+        if self._can_update(available_properties, "更新件数", props):
+            notion_props["更新件数"] = {"number": props["更新件数"]}
+        if self._can_update(available_properties, "エラー件数", props):
+            notion_props["エラー件数"] = {"number": props["エラー件数"]}
+        if not notion_props:
+            return
         self.client.pages.update(page_id=job_page_id, properties=notion_props)
+
+    def _available_properties(self, job_page_id: str) -> dict[str, str]:
+        if job_page_id not in self._property_cache:
+            page = self.client.pages.retrieve(page_id=job_page_id)
+            self._property_cache[job_page_id] = {
+                name: prop.get("type", "unknown")
+                for name, prop in page.get("properties", {}).items()
+            }
+        return self._property_cache[job_page_id]
+
+    def _can_update(self, available_properties: dict[str, str], name: str, props: dict) -> bool:
+        if name not in props:
+            return False
+        expected_type = self.PROP_TYPES[name]
+        actual_type = available_properties.get(name)
+        return actual_type == expected_type

@@ -18,6 +18,7 @@ import os
 import sys
 from datetime import date, datetime
 from pathlib import Path
+from typing import Optional
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / ".env")
@@ -32,6 +33,46 @@ from notion_writer import NotionWriter, NotionJobUpdater
 
 
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
+
+
+def utc_now_iso() -> str:
+    return datetime.utcnow().isoformat() + "Z"
+
+
+def update_job_page(job_updater: Optional[NotionJobUpdater], job_page_id: Optional[str], **props) -> None:
+    """ジョブ履歴の更新はベストエフォートにして本処理を止めない。"""
+    if not job_updater or not job_page_id:
+        return
+    try:
+        job_updater.update(job_page_id, **props)
+    except Exception as e:
+        print(f"[Notion] ジョブページ更新をスキップしました: {e}")
+
+
+def build_progress_callback(job_updater: Optional[NotionJobUpdater], job_page_id: Optional[str]):
+    def callback(event: dict) -> None:
+        props: dict = {
+            "状態": "実行中",
+            "最終更新日時": utc_now_iso(),
+        }
+        message = event.get("message") or event.get("stage")
+        if message:
+            props["進捗"] = str(message)
+        if "transactions_count" in event:
+            props["取引件数"] = event["transactions_count"]
+        if "balances_count" in event:
+            props["残高件数"] = event["balances_count"]
+        if "processed_count" in event:
+            props["処理済み件数"] = event["processed_count"]
+        if "created_count" in event:
+            props["作成件数"] = event["created_count"]
+        if "updated_count" in event:
+            props["更新件数"] = event["updated_count"]
+        if "error_count" in event:
+            props["エラー件数"] = event["error_count"]
+        update_job_page(job_updater, job_page_id, **props)
+
+    return callback
 
 
 def parse_args() -> argparse.Namespace:
@@ -139,9 +180,21 @@ def main():
     print("=" * 50)
 
     try:
+        update_job_page(
+            job_updater,
+            job_page_id,
+            状態="実行中",
+            取得期間=str(date_range),
+            GitHub実行URL=os.getenv("ACTIONS_RUN_URL", ""),
+            進捗="GitHub Actions runner 起動済み",
+            最終更新日時=utc_now_iso(),
+        )
+        progress_callback = build_progress_callback(job_updater, job_page_id)
+
         writer = None
         if token and db_id:
             print("[Notion] DBアクセスとスキーマを検証します...")
+            progress_callback({"message": "Notion取引DBのアクセスとスキーマを検証中"})
             writer = NotionWriter(token=token, db_id=db_id)
             writer.validate_database(include_job_page_id=bool(job_page_id))
             print("[Notion] DB検証OK")
@@ -152,6 +205,7 @@ def main():
             headless=args.headless,
             gas_otp_url=os.getenv("GAS_OTP_URL"),
             gas_otp_secret=os.getenv("GAS_OTP_SECRET"),
+            progress_callback=progress_callback,
         )
         result = scraper.scrape(date_range=date_range)
 
@@ -174,10 +228,20 @@ def main():
         # Notion 書き込み（NOTION_TOKEN と NOTION_DB_ID が設定されている場合のみ）
         if writer:
             print("\n--- Notion ステージングDBへの書き込みを開始します ---")
+            progress_callback({
+                "message": "Notion取引DBへ書き込み開始",
+                "transactions_count": len(result.transactions),
+                "balances_count": len(result.balances),
+                "processed_count": 0,
+                "created_count": 0,
+                "updated_count": 0,
+                "error_count": 0,
+            })
             write_result = writer.upsert_transactions(
                 result.transactions,
                 scraped_at=result.scraped_at,
                 job_page_id=job_page_id,
+                progress_callback=progress_callback,
             )
             print(f"書き込み結果: {write_result}")
             ensure_notion_write_succeeded(write_result)
@@ -186,14 +250,17 @@ def main():
 
         # ジョブページ: 完了に更新
         if job_updater and job_page_id:
-            job_updater.update(
+            update_job_page(
+                job_updater,
                 job_page_id,
                 状態="完了",
-                完了日時=datetime.utcnow().isoformat() + "Z",
+                完了日時=utc_now_iso(),
                 取引件数=len(result.transactions),
                 残高件数=len(result.balances),
                 取得期間=str(date_range),
                 GitHub実行URL=os.getenv("ACTIONS_RUN_URL", ""),
+                進捗="完了",
+                最終更新日時=utc_now_iso(),
             )
             print(f"[Notion] ジョブページを完了に更新しました: {job_page_id}")
 
@@ -201,12 +268,15 @@ def main():
         print(f"ERROR: スクレイピング中に例外が発生しました: {e}")
         # ジョブページ: エラーに更新
         if job_updater and job_page_id:
-            job_updater.update(
+            update_job_page(
+                job_updater,
                 job_page_id,
                 状態="エラー",
-                完了日時=datetime.utcnow().isoformat() + "Z",
+                完了日時=utc_now_iso(),
                 エラー詳細=str(e),
                 GitHub実行URL=os.getenv("ACTIONS_RUN_URL", ""),
+                進捗="エラー",
+                最終更新日時=utc_now_iso(),
             )
             print(f"[Notion] ジョブページをエラーに更新しました: {job_page_id}")
         sys.exit(1)
