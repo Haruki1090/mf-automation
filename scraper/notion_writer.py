@@ -12,9 +12,58 @@ from mf_scraper import Transaction, AssetBalance, ScrapingResult, DateRange
 
 
 class NotionWriter:
+    ACCOUNT_ALIASES = {
+        "ANAカード": [
+            "三井住友カード(vpassid)",
+        ],
+    }
+
+    REQUIRED_TRANSACTION_PROPERTIES = {
+        "メモ": "title",
+        "取引日": "date",
+        "金額": "number",
+        "カテゴリ": "select",
+        "サブカテゴリ": "select",
+        "口座": "select",
+        "収支": "select",
+        "スクレイプ日時": "date",
+    }
+
     def __init__(self, token: str, db_id: str):
         self.client = Client(auth=token)
         self.db_id = db_id
+
+    def validate_database(self, include_job_page_id: bool = False) -> None:
+        """書き込み前にDBアクセス権と必要プロパティを検証する"""
+        try:
+            database = self.client.databases.retrieve(database_id=self.db_id)
+        except Exception as e:
+            raise RuntimeError(
+                "Notion DBにアクセスできません。NOTION_DB_ID とIntegration共有設定を確認してください。"
+            ) from e
+        self._validate_database_properties(database, include_job_page_id=include_job_page_id)
+
+    @classmethod
+    def _validate_database_properties(cls, database: dict, include_job_page_id: bool = False) -> None:
+        required = dict(cls.REQUIRED_TRANSACTION_PROPERTIES)
+        if include_job_page_id:
+            required["ジョブID"] = "rich_text"
+
+        properties = database.get("properties", {})
+        missing = [name for name in required if name not in properties]
+        wrong_types = []
+        for name, expected_type in required.items():
+            if name in properties and properties[name].get("type") != expected_type:
+                actual_type = properties[name].get("type", "unknown")
+                wrong_types.append(f"{name}: expected={expected_type}, actual={actual_type}")
+
+        if missing or wrong_types:
+            details = []
+            if missing:
+                details.append("不足=" + ", ".join(missing))
+            if wrong_types:
+                details.append("型不一致=" + "; ".join(wrong_types))
+            raise RuntimeError("Notion DBスキーマが不足しています: " + " / ".join(details))
 
     def upsert_transactions(
         self,
@@ -54,7 +103,7 @@ class NotionWriter:
                 "and": [
                     {"property": "取引日", "date": {"equals": self._parse_date(tx.date)}},
                     {"property": "金額", "number": {"equals": tx.amount}},
-                    {"property": "口座", "select": {"equals": tx.account}},
+                    self._account_filter(tx),
                 ]
             }
         )
@@ -80,7 +129,7 @@ class NotionWriter:
             "金額": {"number": tx.amount},
             "カテゴリ": {"select": {"name": tx.category or "未分類"}},
             "サブカテゴリ": {"select": {"name": tx.sub_category or "未分類"}},
-            "口座": {"select": {"name": tx.account or "不明"}},
+            "口座": {"select": {"name": self.normalize_account(tx.account)}},
             "収支": {"select": {"name": self._derive_incexp(tx)}},
         }
         if scraped_at:
@@ -88,6 +137,38 @@ class NotionWriter:
         if job_page_id:
             props["ジョブID"] = {"rich_text": [{"text": {"content": job_page_id}}]}
         return props
+
+    @classmethod
+    def normalize_account(cls, account: str) -> str:
+        normalized = " ".join((account or "").split())
+        if not normalized:
+            return "不明"
+
+        key = cls._account_alias_key(normalized)
+        for canonical, aliases in cls.ACCOUNT_ALIASES.items():
+            if key in aliases:
+                return canonical
+        return normalized
+
+    @classmethod
+    def _account_filter(cls, tx: Transaction) -> dict:
+        accounts = []
+        for account in (cls.normalize_account(tx.account), " ".join((tx.account or "").split())):
+            if account and account not in accounts:
+                accounts.append(account)
+
+        filters = [{"property": "口座", "select": {"equals": account}} for account in accounts]
+        return filters[0] if len(filters) == 1 else {"or": filters}
+
+    @staticmethod
+    def _account_alias_key(account: str) -> str:
+        return (
+            account
+            .replace("（", "(")
+            .replace("）", ")")
+            .replace(" ", "")
+            .lower()
+        )
 
     @staticmethod
     def _derive_incexp(tx: Transaction) -> str:
