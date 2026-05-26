@@ -28,7 +28,7 @@ from mf_scraper import (
     range_current_month, range_last_month, range_specific_month,
     range_this_week, range_last_week,
 )
-from notion_writer import NotionWriter
+from notion_writer import NotionWriter, NotionJobUpdater
 
 
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
@@ -46,6 +46,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--month", metavar="YYYY-MM", help="指定月 (--mode month 時に使用)")
     parser.add_argument("--from", dest="from_date", metavar="YYYY-MM-DD", help="開始日 (--mode range 時に使用)")
     parser.add_argument("--to", dest="to_date", metavar="YYYY-MM-DD", help="終了日 (--mode range 時に使用)")
+    parser.add_argument("--job-page-id", dest="job_page_id", metavar="PAGE_ID", help="ジョブ実行履歴ページID（Worker経由時に自動設定）")
     return parser.parse_args()
 
 
@@ -115,6 +116,9 @@ def main():
         sys.exit(1)
 
     date_range = resolve_date_range(args)
+    token = os.getenv("NOTION_TOKEN")
+    job_page_id: str | None = args.job_page_id or None
+    job_updater = NotionJobUpdater(token=token) if (token and job_page_id) else None
 
     print("=" * 50)
     print("MoneyForward ME スクレイピング開始")
@@ -122,42 +126,73 @@ def main():
     print(f"headless: {args.headless}")
     print("=" * 50)
 
-    scraper = MoneyForwardScraper(
-        email=email,
-        password=password,
-        headless=args.headless,
-        gas_otp_url=os.getenv("GAS_OTP_URL"),
-        gas_otp_secret=os.getenv("GAS_OTP_SECRET"),
-    )
-    result = scraper.scrape(date_range=date_range)
+    try:
+        scraper = MoneyForwardScraper(
+            email=email,
+            password=password,
+            headless=args.headless,
+            gas_otp_url=os.getenv("GAS_OTP_URL"),
+            gas_otp_secret=os.getenv("GAS_OTP_SECRET"),
+        )
+        result = scraper.scrape(date_range=date_range)
 
-    # CSV 保存
-    tx_path, bal_path = save_csv(result, date_range)
-    print(f"\n[CSV] 明細: {tx_path}")
-    print(f"[CSV] 残高: {bal_path}")
+        # CSV 保存
+        tx_path, bal_path = save_csv(result, date_range)
+        print(f"\n[CSV] 明細: {tx_path}")
+        print(f"[CSV] 残高: {bal_path}")
 
-    # プレビュー（先頭5件）
-    preview = {
-        "scraped_at": result.scraped_at,
-        "period": str(date_range),
-        "transactions_count": len(result.transactions),
-        "transactions": [vars(t) for t in result.transactions[:5]],
-        "balances": [vars(b) for b in result.balances],
-    }
-    print("\n--- プレビュー（先頭5件） ---")
-    print(json.dumps(preview, ensure_ascii=False, indent=2))
+        # プレビュー（先頭5件）
+        preview = {
+            "scraped_at": result.scraped_at,
+            "period": str(date_range),
+            "transactions_count": len(result.transactions),
+            "transactions": [vars(t) for t in result.transactions[:5]],
+            "balances": [vars(b) for b in result.balances],
+        }
+        print("\n--- プレビュー（先頭5件） ---")
+        print(json.dumps(preview, ensure_ascii=False, indent=2))
 
-    # Notion 書き込み（NOTION_TOKEN と NOTION_DB_ID が設定されている場合のみ）
-    token = os.getenv("NOTION_TOKEN")
-    db_id = os.getenv("NOTION_DB_ID")
+        # Notion 書き込み（NOTION_TOKEN と NOTION_DB_ID が設定されている場合のみ）
+        db_id = os.getenv("NOTION_DB_ID")
 
-    if token and db_id:
-        print("\n--- Notion への書き込みを開始します ---")
-        writer = NotionWriter(token=token, db_id=db_id)
-        write_result = writer.upsert_transactions(result.transactions)
-        print(f"書き込み結果: {write_result}")
-    else:
-        print("\n--- Notion設定なし: CSV のみ出力しました ---")
+        if token and db_id:
+            print("\n--- Notion ステージングDBへの書き込みを開始します ---")
+            writer = NotionWriter(token=token, db_id=db_id)
+            write_result = writer.upsert_transactions(
+                result.transactions,
+                scraped_at=result.scraped_at,
+                job_page_id=job_page_id,
+            )
+            print(f"書き込み結果: {write_result}")
+        else:
+            print("\n--- Notion設定なし: CSV のみ出力しました ---")
+
+        # ジョブページ: 完了に更新
+        if job_updater and job_page_id:
+            job_updater.update(
+                job_page_id,
+                状態="完了",
+                完了日時=datetime.utcnow().isoformat() + "Z",
+                取引件数=len(result.transactions),
+                残高件数=len(result.balances),
+                取得期間=str(date_range),
+                GitHub実行URL=os.getenv("GITHUB_RUN_URL", ""),
+            )
+            print(f"[Notion] ジョブページを完了に更新しました: {job_page_id}")
+
+    except Exception as e:
+        print(f"ERROR: スクレイピング中に例外が発生しました: {e}")
+        # ジョブページ: エラーに更新
+        if job_updater and job_page_id:
+            job_updater.update(
+                job_page_id,
+                状態="エラー",
+                完了日時=datetime.utcnow().isoformat() + "Z",
+                エラー詳細=str(e),
+                GitHub実行URL=os.getenv("GITHUB_RUN_URL", ""),
+            )
+            print(f"[Notion] ジョブページをエラーに更新しました: {job_page_id}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

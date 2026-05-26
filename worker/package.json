@@ -1,0 +1,20 @@
+{
+  "name": "mf-automation-worker",
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "check": "tsc --noEmit",
+    "deploy": "ntn workers deploy"
+  },
+  "dependencies": {
+    "@notionhq/workers": ">=0.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "typescript": "^5.8.0"
+  }
+}

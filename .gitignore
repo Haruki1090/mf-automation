@@ -25,5 +25,9 @@ gas/.clasp.json
 debug_*.png
 *.bak
 
+# Worker
+worker/node_modules/
+worker/dist/
+
 # OS
 .DS_Store

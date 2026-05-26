@@ -1,0 +1,81 @@
+name: MF Scraping
+
+on:
+  # Notion Worker A からの自動トリガー
+  repository_dispatch:
+    types: [scrape-moneyforward]
+  # GitHub UI / CLI からの手動実行
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '日付モード'
+        required: false
+        default: 'current_month'
+        type: choice
+        options:
+          - current_month
+          - last_month
+          - this_week
+          - last_week
+          - month
+          - range
+      month:
+        description: '指定月 YYYY-MM（mode=month 時）'
+        required: false
+        default: ''
+      from_date:
+        description: '開始日 YYYY-MM-DD（mode=range 時）'
+        required: false
+        default: ''
+      to_date:
+        description: '終了日 YYYY-MM-DD（mode=range 時）'
+        required: false
+        default: ''
+      job_page_id:
+        description: 'Notion ジョブページID（Worker 経由の場合に自動設定）'
+        required: false
+        default: ''
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: コードチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 セットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: 依存パッケージインストール
+        run: pip install -r requirements.txt
+
+      - name: Playwright Chromium インストール
+        run: python -m playwright install chromium --with-deps
+
+      - name: スクレイピング実行
+        env:
+          MF_EMAIL:        ${{ secrets.MF_EMAIL }}
+          MF_PASSWORD:     ${{ secrets.MF_PASSWORD }}
+          NOTION_TOKEN:    ${{ secrets.NOTION_TOKEN }}
+          NOTION_DB_ID:    ${{ secrets.NOTION_DB_ID }}
+          GAS_OTP_URL:     ${{ secrets.GAS_OTP_URL }}
+          GAS_OTP_SECRET:  ${{ secrets.GAS_OTP_SECRET }}
+          GITHUB_RUN_URL:  ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SCRAPE_MODE:     ${{ github.event.client_payload.mode     || inputs.mode      || 'current_month' }}
+          SCRAPE_MONTH:    ${{ github.event.client_payload.month    || inputs.month     || '' }}
+          SCRAPE_FROM:     ${{ github.event.client_payload.from_date || inputs.from_date || '' }}
+          SCRAPE_TO:       ${{ github.event.client_payload.to_date  || inputs.to_date   || '' }}
+          JOB_PAGE_ID:     ${{ github.event.client_payload.job_page_id || inputs.job_page_id || '' }}
+        run: |
+          ARGS="--headless --mode ${SCRAPE_MODE}"
+          [ -n "${SCRAPE_MONTH}"  ] && ARGS="${ARGS} --month    ${SCRAPE_MONTH}"
+          [ -n "${SCRAPE_FROM}"   ] && ARGS="${ARGS} --from     ${SCRAPE_FROM}"
+          [ -n "${SCRAPE_TO}"     ] && ARGS="${ARGS} --to       ${SCRAPE_TO}"
+          [ -n "${JOB_PAGE_ID}"   ] && ARGS="${ARGS} --job-page-id ${JOB_PAGE_ID}"
+          python scraper/main.py ${ARGS}
