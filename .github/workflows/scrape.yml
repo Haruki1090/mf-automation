@@ -41,7 +41,7 @@ jobs:
       - name: コードチェックアウト
         uses: actions/checkout@v4
         with:
-          persist-credentials: false
+          token: ${{ secrets.GH_PAT }}
 
       - name: Python 3.11 セットアップ
         uses: actions/setup-python@v5
