@@ -30,10 +30,15 @@ class NotionWriter:
         "収支": "select",
         "スクレイプ日時": "date",
     }
+    OPTIONAL_TRANSACTION_PROPERTIES = {
+        "ジョブID": "rich_text",
+    }
 
     def __init__(self, token: str, db_id: str):
         self.client = Client(auth=token)
         self.db_id = db_id
+        self._transaction_property_types: Optional[dict[str, str]] = None
+        self._optional_property_warnings: set[str] = set()
 
     def validate_database(self, include_job_page_id: bool = False) -> None:
         """書き込み前にDBアクセス権と必要プロパティを検証する"""
@@ -43,13 +48,14 @@ class NotionWriter:
             raise RuntimeError(
                 "Notion DBにアクセスできません。NOTION_DB_ID とIntegration共有設定を確認してください。"
             ) from e
-        self._validate_database_properties(database, include_job_page_id=include_job_page_id)
+        self._transaction_property_types = self._property_types(database)
+        self._validate_database_properties(database)
+        if include_job_page_id:
+            self._warn_if_optional_property_unavailable("ジョブID")
 
     @classmethod
     def _validate_database_properties(cls, database: dict, include_job_page_id: bool = False) -> None:
         required = dict(cls.REQUIRED_TRANSACTION_PROPERTIES)
-        if include_job_page_id:
-            required["ジョブID"] = "rich_text"
 
         properties = database.get("properties", {})
         missing = [name for name in required if name not in properties]
@@ -66,6 +72,35 @@ class NotionWriter:
             if wrong_types:
                 details.append("型不一致=" + "; ".join(wrong_types))
             raise RuntimeError("Notion DBスキーマが不足しています: " + " / ".join(details))
+
+    @staticmethod
+    def _property_types(database: dict) -> dict[str, str]:
+        return {
+            name: prop.get("type", "unknown")
+            for name, prop in database.get("properties", {}).items()
+        }
+
+    def _load_transaction_property_types(self) -> dict[str, str]:
+        if self._transaction_property_types is None:
+            database = self.client.databases.retrieve(database_id=self.db_id)
+            self._transaction_property_types = self._property_types(database)
+        return self._transaction_property_types
+
+    def _can_write_optional_property(self, name: str) -> bool:
+        expected_type = self.OPTIONAL_TRANSACTION_PROPERTIES[name]
+        properties = self._load_transaction_property_types()
+        return properties.get(name) == expected_type
+
+    def _warn_if_optional_property_unavailable(self, name: str) -> None:
+        if name in self._optional_property_warnings:
+            return
+        expected_type = self.OPTIONAL_TRANSACTION_PROPERTIES[name]
+        properties = self._load_transaction_property_types()
+        actual_type = properties.get(name)
+        if actual_type != expected_type:
+            detail = "未作成" if actual_type is None else f"型不一致({actual_type})"
+            print(f"[Notion] 取引DBの任意プロパティ {name} は利用できません: {detail}。保存をスキップします。")
+            self._optional_property_warnings.add(name)
 
     def upsert_transactions(
         self,
@@ -171,8 +206,10 @@ class NotionWriter:
         }
         if scraped_at:
             props["スクレイプ日時"] = {"date": {"start": scraped_at}}
-        if job_page_id:
+        if job_page_id and self._can_write_optional_property("ジョブID"):
             props["ジョブID"] = {"rich_text": [{"text": {"content": job_page_id}}]}
+        elif job_page_id:
+            self._warn_if_optional_property_unavailable("ジョブID")
         return props
 
     @classmethod

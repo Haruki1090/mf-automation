@@ -59,10 +59,9 @@ class TestNotionDatabaseValidation:
         db = self.database_with_properties(**NotionWriter.REQUIRED_TRANSACTION_PROPERTIES)
         NotionWriter._validate_database_properties(db)
 
-    def test_requires_job_id_when_worker_job_is_used(self):
+    def test_job_id_is_optional_when_worker_job_is_used(self):
         db = self.database_with_properties(**NotionWriter.REQUIRED_TRANSACTION_PROPERTIES)
-        with pytest.raises(RuntimeError, match="ジョブID"):
-            NotionWriter._validate_database_properties(db, include_job_page_id=True)
+        NotionWriter._validate_database_properties(db, include_job_page_id=True)
 
     def test_rejects_wrong_property_type(self):
         props = dict(NotionWriter.REQUIRED_TRANSACTION_PROPERTIES)
@@ -70,6 +69,46 @@ class TestNotionDatabaseValidation:
         db = self.database_with_properties(**props)
         with pytest.raises(RuntimeError, match="金額"):
             NotionWriter._validate_database_properties(db)
+
+    def test_includes_job_id_when_optional_property_exists(self):
+        writer = NotionWriter.__new__(NotionWriter)
+        writer._transaction_property_types = {"ジョブID": "rich_text"}
+        writer._optional_property_warnings = set()
+
+        props = writer._build_properties(
+            Transaction(
+                date="2026-05-01",
+                amount=-100,
+                category="食費",
+                sub_category="外食",
+                account="カード",
+                memo="test",
+            ),
+            scraped_at="2026-05-01T00:00:00Z",
+            job_page_id="job-page-id",
+        )
+
+        assert props["ジョブID"] == {"rich_text": [{"text": {"content": "job-page-id"}}]}
+
+    def test_skips_job_id_when_optional_property_is_missing(self):
+        writer = NotionWriter.__new__(NotionWriter)
+        writer._transaction_property_types = {}
+        writer._optional_property_warnings = set()
+
+        props = writer._build_properties(
+            Transaction(
+                date="2026-05-01",
+                amount=-100,
+                category="食費",
+                sub_category="外食",
+                account="カード",
+                memo="test",
+            ),
+            scraped_at="2026-05-01T00:00:00Z",
+            job_page_id="job-page-id",
+        )
+
+        assert "ジョブID" not in props
 
 
 class FakePagesClient:

@@ -116,9 +116,8 @@ Workerからジョブページを作成する場合は、WorkerのNotion Integra
 | 口座 | Select |
 | 収支 | Select |
 | スクレイプ日時 | Date |
-| ジョブID | Text / Rich text |
 
-`--job-page-id` を指定するWorker経由実行では `ジョブID` も必須です。  
+Worker経由実行で取引とジョブ履歴を紐づけたい場合は、取引DBに任意で `ジョブID`（Text / Rich text）を追加してください。未作成の場合、`ジョブID` の保存だけをスキップして処理は継続します。  
 実行前にDBアクセス権とプロパティ型を検証し、不足があればスクレイピング前に停止します。
 
 口座名はNotion保存時に一部正規化します。
@@ -195,7 +194,7 @@ curl "https://script.google.com/macros/s/YOUR_ID/exec?secret=YOUR_SECRET"
 make test
 ```
 
-日付範囲ロジック・金額パース・日付パースを 37 件のテストで検証します。
+日付範囲ロジック・金額パース・日付パース・Notionスキーマ処理をテストで検証します。
 
 ### 統合シナリオテスト（実ブラウザ・実アカウント使用）
 
