@@ -1,0 +1,10 @@
+name: Push Test
+on:
+  push:
+    paths:
+      - '.github/workflows/push_test.yml'
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "push trigger works"
