@@ -4,92 +4,174 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MF自動取得パイプライン — システム概要</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Source+Serif+4:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     /* ── リセット＆ベース ─────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
-    }
-    body {
-      font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", sans-serif;
-      font-size: 15px;
-      line-height: 1.75;
-      color: #1a1a2e;
-      background: #f5f7fb;
+      .fade-in-up { opacity: 1 !important; transform: none !important; transition: none !important; }
     }
 
-    /* ── カラー変数 ──────────────────────────────── */
+    /* ── カラー変数（Nexadata ブランド） ────────────── */
     :root {
-      --primary:   #2563eb;
-      --primary-d: #1d4ed8;
-      --accent:    #0ea5e9;
-      --success:   #16a34a;
-      --warn:      #d97706;
-      --danger:    #dc2626;
-      --surface:   #ffffff;
-      --border:    #e2e8f0;
-      --muted:     #64748b;
-      --code-bg:   #0f172a;
+      --midnight:       #0B2034;
+      --midnight-55:    rgba(11, 32, 52, 0.55);
+      --midnight-10:    rgba(11, 32, 52, 0.10);
+      --midnight-8:     rgba(11, 32, 52, 0.08);
+      --midnight-5:     rgba(11, 32, 52, 0.05);
+      --cool-gray:      #CAD2DD;
+      --cool-gray-dark: #8896a7;
+      --amber:          #D4922A;
+      --amber-dark:     #7A5010;
+      --surface:        #ffffff;
+      --bg:             #f8fafc;
+      --code-bg:        #0f172a;
+      --success:        #16a34a;
+      --danger:         #dc2626;
+    }
+
+    /* ── ベースボディ ────────────────────────────── */
+    body {
+      font-family: "Noto Sans JP", "Inter", sans-serif;
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--midnight);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
     }
 
     /* ── レイアウト ──────────────────────────────── */
-    .wrapper { max-width: 960px; margin: 0 auto; padding: 0 24px 80px; }
+    .wrapper { max-width: 960px; margin: 0 auto; padding: 0 24px 96px; }
 
     /* ── ヘッダー ────────────────────────────────── */
     header {
-      background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #0ea5e9 100%);
+      position: relative;
+      background: var(--midnight);
       color: #fff;
-      padding: 56px 32px 48px;
-      clip-path: polygon(0 0, 100% 0, 100% 88%, 0 100%);
-      margin-bottom: 48px;
+      padding: 72px 32px 64px;
+      overflow: hidden;
+      margin-bottom: 56px;
     }
-    header .inner { max-width: 960px; margin: 0 auto; }
-    header .badge {
-      display: inline-block;
-      background: rgba(255,255,255,0.2);
-      border: 1px solid rgba(255,255,255,0.35);
-      border-radius: 999px;
-      font-size: 12px;
-      padding: 3px 14px;
-      letter-spacing: 0.05em;
-      margin-bottom: 16px;
+    header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(11,32,52,0.98) 0%, rgba(11,32,52,0.80) 60%, rgba(11,32,52,0.60) 100%);
+      pointer-events: none;
     }
-    header h1 { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
-    header p  { margin-top: 12px; opacity: 0.88; max-width: 640px; font-size: 1rem; }
-    header .meta { margin-top: 20px; display: flex; gap: 24px; flex-wrap: wrap; opacity: 0.75; font-size: 13px; }
-
-    /* ── セクション ──────────────────────────────── */
-    section { margin-bottom: 48px; }
-    h2 {
-      font-size: 1.35rem;
-      font-weight: 700;
-      color: var(--primary-d);
-      border-left: 4px solid var(--primary);
-      padding-left: 14px;
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--amber);
+    }
+    .header-dot-grid {
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(202,210,221,0.18) 1px, transparent 1px);
+      background-size: 32px 32px;
+      pointer-events: none;
+    }
+    header .inner {
+      position: relative;
+      z-index: 1;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    .header-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--amber);
       margin-bottom: 20px;
     }
-    h3 {
-      font-size: 1.05rem;
+    .header-eyebrow::before {
+      content: '';
+      display: inline-block;
+      width: 24px;
+      height: 2px;
+      background: var(--amber);
+    }
+    header h1 {
+      font-family: "Source Serif 4", "Noto Sans JP", Georgia, serif;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
       font-weight: 700;
-      color: #1e293b;
-      margin: 24px 0 10px;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: #fff;
+    }
+    header p {
+      margin-top: 16px;
+      color: var(--cool-gray);
+      max-width: 600px;
+      font-size: 0.95rem;
+      line-height: 1.8;
+    }
+    .header-meta {
+      margin-top: 28px;
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      color: var(--cool-gray-dark);
+      font-size: 12px;
+      letter-spacing: 0.03em;
+    }
+    .header-meta span { display: flex; align-items: center; gap: 6px; }
+
+    /* ── セクション ──────────────────────────────── */
+    section { margin-bottom: 56px; }
+    h2 {
+      font-family: "Source Serif 4", Georgia, serif;
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: var(--midnight);
+      letter-spacing: -0.01em;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    h2::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 1.3em;
+      background: var(--amber);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--midnight);
+      margin: 28px 0 12px;
     }
     p { margin-bottom: 12px; color: #334155; }
 
     /* ── カード ──────────────────────────────────── */
     .card {
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px 28px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      border: 1px solid var(--midnight-10);
+      border-radius: 16px;
+      padding: 28px 32px;
+      box-shadow: 0 1px 4px rgba(11,32,52,0.06);
     }
     .card + .card { margin-top: 16px; }
 
     /* ── グリッド ────────────────────────────────── */
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
     @media (max-width: 700px) {
       .grid-2, .grid-3 { grid-template-columns: 1fr; }
     }
@@ -97,25 +179,43 @@
     /* ── 特徴カード ──────────────────────────────── */
     .feature-card {
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px 22px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      border: 1px solid var(--midnight-10);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(11,32,52,0.05);
+      position: relative;
+      overflow: hidden;
+      transition: box-shadow 0.2s ease, border-color 0.2s ease;
     }
+    .feature-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--amber);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.3s ease;
+    }
+    .feature-card:hover { box-shadow: 0 4px 16px rgba(11,32,52,0.10); border-color: rgba(11,32,52,0.18); }
+    .feature-card:hover::after { transform: scaleX(1); }
     .feature-card .icon {
-      font-size: 1.8rem;
-      margin-bottom: 10px;
+      font-size: 1.6rem;
+      margin-bottom: 12px;
       display: block;
     }
-    .feature-card strong { display: block; font-size: 1rem; margin-bottom: 6px; color: #0f172a; }
-    .feature-card p { font-size: 0.88rem; margin: 0; color: var(--muted); }
+    .feature-card strong { display: block; font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; color: var(--midnight); }
+    .feature-card p { font-size: 0.855rem; margin: 0; color: var(--cool-gray-dark); line-height: 1.7; }
 
     /* ── アーキテクチャ図 ────────────────────────── */
     .arch {
       background: var(--code-bg);
-      border-radius: 12px;
-      padding: 28px 32px;
+      border-radius: 14px;
+      padding: 32px 36px;
       overflow-x: auto;
+      border: 1px solid rgba(255,255,255,0.05);
     }
     .arch pre {
       font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
@@ -124,12 +224,12 @@
       color: #e2e8f0;
       white-space: pre;
     }
-    .arch .c-blue   { color: #60a5fa; }
+    .arch .c-midnight { color: #93c5fd; }
+    .arch .c-amber  { color: #fbbf24; }
     .arch .c-green  { color: #4ade80; }
-    .arch .c-yellow { color: #fbbf24; }
     .arch .c-cyan   { color: #67e8f9; }
-    .arch .c-pink   { color: #f472b6; }
-    .arch .c-gray   { color: #94a3b8; }
+    .arch .c-pink   { color: #f9a8d4; }
+    .arch .c-gray   { color: #64748b; }
 
     /* ── フロー図 ─────────────────────────────────── */
     .flow {
@@ -137,15 +237,15 @@
       align-items: stretch;
       flex-wrap: wrap;
       gap: 0;
-      margin: 16px 0;
+      margin: 20px 0;
     }
     .flow-step {
       flex: 1;
       min-width: 120px;
       background: var(--surface);
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      padding: 14px 16px;
+      border: 1px solid var(--midnight-10);
+      border-radius: 12px;
+      padding: 16px;
       text-align: center;
       position: relative;
     }
@@ -153,50 +253,51 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 24px; height: 24px;
+      width: 28px; height: 28px;
       border-radius: 50%;
-      background: var(--primary);
+      background: var(--midnight);
       color: #fff;
       font-size: 12px;
       font-weight: 700;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
-    .flow-step strong { display: block; font-size: 0.88rem; color: #0f172a; }
-    .flow-step span   { font-size: 0.78rem; color: var(--muted); }
+    .flow-step strong { display: block; font-size: 0.855rem; font-weight: 700; color: var(--midnight); }
+    .flow-step span { font-size: 0.775rem; color: var(--cool-gray-dark); line-height: 1.5; display: block; margin-top: 4px; }
     .flow-arrow {
       display: flex;
       align-items: center;
-      color: var(--accent);
-      font-size: 1.4rem;
-      padding: 0 6px;
+      color: var(--amber);
+      font-size: 1.2rem;
+      padding: 0 8px;
     }
 
     /* ── テーブル ────────────────────────────────── */
-    .tbl-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+    .tbl-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--midnight-10); }
     table { width: 100%; border-collapse: collapse; background: var(--surface); font-size: 14px; }
-    thead { background: #f1f5f9; }
-    th, td { padding: 10px 16px; text-align: left; border-bottom: 1px solid var(--border); }
-    th { font-weight: 700; color: #475569; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+    thead { background: rgba(11,32,52,0.04); }
+    th, td { padding: 11px 18px; text-align: left; border-bottom: 1px solid var(--midnight-8); }
+    th { font-weight: 600; color: var(--cool-gray-dark); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
     tr:last-child td { border-bottom: none; }
-    tbody tr:hover { background: #f8fafc; }
-    td code { background: #f1f5f9; border-radius: 4px; padding: 1px 6px; font-size: 12px; font-family: monospace; }
+    tbody tr:hover { background: rgba(11,32,52,0.025); }
+    td code { background: rgba(11,32,52,0.06); border-radius: 4px; padding: 1px 7px; font-size: 12px; font-family: monospace; color: var(--midnight); }
 
     /* ── コードブロック ──────────────────────────── */
     .code-block {
       background: var(--code-bg);
-      border-radius: 10px;
-      padding: 20px 24px;
+      border-radius: 12px;
+      padding: 22px 28px;
       overflow-x: auto;
-      margin: 12px 0;
+      margin: 14px 0;
+      border: 1px solid rgba(255,255,255,0.05);
     }
     .code-block pre {
       font-family: "JetBrains Mono", "Fira Code", monospace;
       font-size: 13px;
-      line-height: 1.6;
+      line-height: 1.65;
       color: #e2e8f0;
     }
-    .code-block .comment { color: #64748b; }
-    .code-block .key     { color: #60a5fa; }
+    .code-block .comment { color: #475569; }
+    .code-block .key     { color: #93c5fd; }
     .code-block .val     { color: #4ade80; }
     .code-block .str     { color: #fbbf24; }
 
@@ -204,75 +305,187 @@
     .tag {
       display: inline-block;
       border-radius: 6px;
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 600;
       padding: 2px 10px;
       margin: 2px;
+      letter-spacing: 0.02em;
     }
-    .tag-blue   { background: #dbeafe; color: #1d4ed8; }
-    .tag-green  { background: #dcfce7; color: #15803d; }
-    .tag-yellow { background: #fef9c3; color: #a16207; }
-    .tag-red    { background: #fee2e2; color: #b91c1c; }
-    .tag-gray   { background: #f1f5f9; color: #475569; }
+    .tag-midnight { background: rgba(11,32,52,0.08); color: var(--midnight); }
+    .tag-amber    { background: rgba(212,146,42,0.12); color: var(--amber-dark); }
+    .tag-green    { background: #dcfce7; color: #15803d; }
+    .tag-red      { background: #fee2e2; color: #b91c1c; }
+    .tag-gray     { background: rgba(11,32,52,0.05); color: var(--cool-gray-dark); }
 
     /* ── タイムライン ────────────────────────────── */
-    .timeline { border-left: 3px solid var(--border); padding-left: 24px; }
-    .tl-item { position: relative; padding-bottom: 20px; }
+    .timeline { border-left: 2px solid var(--midnight-10); padding-left: 28px; }
+    .tl-item { position: relative; padding-bottom: 24px; }
     .tl-item:last-child { padding-bottom: 0; }
     .tl-dot {
       position: absolute;
-      left: -32px;
-      top: 4px;
+      left: -36px;
+      top: 5px;
       width: 16px; height: 16px;
       border-radius: 50%;
-      background: var(--primary);
+      background: var(--midnight);
       border: 3px solid var(--surface);
-      box-shadow: 0 0 0 2px var(--primary);
+      box-shadow: 0 0 0 2px var(--midnight);
     }
-    .tl-item strong { font-size: 0.9rem; color: #0f172a; }
-    .tl-item p { font-size: 0.85rem; color: var(--muted); margin: 2px 0 0; }
+    .tl-dot-success {
+      background: var(--success);
+      box-shadow: 0 0 0 2px var(--success);
+    }
+    .tl-item strong { font-size: 0.9rem; color: var(--midnight); font-weight: 700; }
+    .tl-item p { font-size: 0.845rem; color: var(--cool-gray-dark); margin: 3px 0 0; }
 
     /* ── 注意書き ────────────────────────────────── */
     .notice {
       border-radius: 10px;
       padding: 14px 18px;
-      font-size: 0.88rem;
+      font-size: 0.875rem;
       display: flex;
       gap: 12px;
       align-items: flex-start;
-      margin: 12px 0;
+      margin: 14px 0;
+      line-height: 1.6;
     }
-    .notice-warn  { background: #fffbeb; border: 1px solid #fcd34d; color: #78350f; }
-    .notice-info  { background: #eff6ff; border: 1px solid #93c5fd; color: #1e3a8a; }
-    .notice-danger{ background: #fef2f2; border: 1px solid #fca5a5; color: #7f1d1d; }
-    .notice-icon  { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+    .notice-warn   { background: rgba(212,146,42,0.08); border: 1px solid rgba(212,146,42,0.30); color: var(--amber-dark); }
+    .notice-info   { background: rgba(11,32,52,0.04); border: 1px solid var(--midnight-10); color: var(--midnight); }
+    .notice-danger { background: #fef2f2; border: 1px solid #fca5a5; color: #7f1d1d; }
+    .notice-icon   { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+
+    /* ── 目次 ────────────────────────────────────── */
+    .toc {
+      background: var(--surface);
+      border: 1px solid var(--midnight-10);
+      border-radius: 16px;
+      padding: 24px 28px;
+      margin-bottom: 48px;
+    }
+    .toc-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--cool-gray-dark);
+      margin-bottom: 14px;
+    }
+    .toc ol  { padding-left: 20px; }
+    .toc li  { margin: 5px 0; }
+    .toc a   { color: var(--midnight); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.15s; }
+    .toc a:hover { color: var(--amber); }
+
+    /* ── 区切り ──────────────────────────────────── */
+    hr { border: none; border-top: 1px solid var(--midnight-8); margin: 36px 0; }
 
     /* ── フッター ────────────────────────────────── */
     footer {
+      background: var(--midnight);
+      color: var(--cool-gray);
+      padding: 48px 32px;
       text-align: center;
-      padding: 40px 24px;
-      color: var(--muted);
       font-size: 13px;
-      border-top: 1px solid var(--border);
-      margin-top: 48px;
+      margin-top: 56px;
+      position: relative;
     }
+    footer::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--amber);
+    }
+    footer p { margin-bottom: 4px; color: var(--cool-gray-dark); }
 
-    /* ── ナビ ────────────────────────────────────── */
-    .toc {
+    /* ── フェードインアニメーション ─────────────── */
+    .fade-in-up {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    .fade-in-up.in-view { opacity: 1; transform: translateY(0); }
+    .delay-1 { transition-delay: 80ms; }
+    .delay-2 { transition-delay: 160ms; }
+    .delay-3 { transition-delay: 240ms; }
+    .delay-4 { transition-delay: 320ms; }
+    .delay-5 { transition-delay: 400ms; }
+    .delay-6 { transition-delay: 480ms; }
+
+    /* ── アーキテクチャ ビジュアル ─────────────── */
+    .arch-visual { display: flex; flex-direction: column; gap: 0; }
+
+    .av-layer {
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+      border: 1px solid var(--midnight-10);
+      border-left: 3px solid var(--amber);
+      border-radius: 14px;
       padding: 20px 24px;
-      margin-bottom: 40px;
     }
-    .toc h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px; }
-    .toc ol  { padding-left: 20px; }
-    .toc li  { margin: 4px 0; }
-    .toc a   { color: var(--primary); text-decoration: none; font-size: 14px; }
-    .toc a:hover { text-decoration: underline; }
 
-    /* ── 区切り ──────────────────────────────────── */
-    hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+    .av-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      border-radius: 6px;
+      padding: 3px 10px;
+      margin-bottom: 16px;
+    }
+
+    .av-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+    .av-node {
+      background: rgba(11,32,52,0.03);
+      border: 1px solid var(--midnight-10);
+      border-radius: 10px;
+      padding: 14px 18px;
+    }
+    .av-node strong { display: block; font-size: 0.875rem; font-weight: 700; color: var(--midnight); margin-bottom: 4px; }
+    .av-node span   { font-size: 0.8rem; color: var(--cool-gray-dark); line-height: 1.45; display: block; }
+
+    .av-h-arrow { color: var(--amber); font-size: 1.4rem; font-weight: 700; flex-shrink: 0; }
+
+    .av-connector {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 4px 0;
+      gap: 3px;
+    }
+    .av-connector-line   { width: 2px; height: 20px; background: var(--amber); opacity: 0.45; }
+    .av-connector-arrow  { color: var(--amber); font-size: 0.85rem; line-height: 1; }
+    .av-connector-label  { font-size: 11px; color: var(--cool-gray-dark); font-weight: 500; text-align: center; padding: 1px 8px; letter-spacing: 0.02em; }
+
+    .av-steps { display: flex; align-items: stretch; flex-wrap: wrap; gap: 0; margin-top: 14px; }
+    .av-step {
+      flex: 1;
+      min-width: 78px;
+      text-align: center;
+      background: rgba(11,32,52,0.04);
+      border: 1px solid var(--midnight-10);
+      border-radius: 8px;
+      padding: 10px 8px;
+    }
+    .av-step.accent { background: var(--midnight); border-color: var(--midnight); }
+    .av-step-num  { display: block; font-size: 11px; font-weight: 700; color: var(--midnight); margin-bottom: 4px; }
+    .av-step-text { font-size: 10.5px; color: var(--cool-gray-dark); line-height: 1.35; display: block; }
+    .av-step.accent .av-step-num,
+    .av-step.accent .av-step-text { color: #fff; }
+    .av-step-arrow { color: var(--amber); font-size: 0.9rem; padding: 0 4px; flex-shrink: 0; display: flex; align-items: center; }
+
+    .av-split { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: start; }
+    .av-bidir {
+      display: flex; align-items: center; justify-content: center;
+      color: var(--amber); font-size: 1.4rem; font-weight: 700;
+      padding: 0 4px; padding-top: 48px;
+    }
+    @media (max-width: 640px) {
+      .av-split { grid-template-columns: 1fr; }
+      .av-bidir { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -281,14 +494,24 @@
      ヘッダー
 ═══════════════════════════════════════════════ -->
 <header>
+  <div class="header-dot-grid" aria-hidden="true"></div>
   <div class="inner">
-    <div class="badge">技術概要ドキュメント</div>
+    <div class="header-eyebrow">技術概要ドキュメント</div>
     <h1>MF自動取得パイプライン</h1>
     <p>MoneyForward ME から入出金明細・口座残高を自動収集し、Notion データベースへリアルタイムに同期するフルマネージド自動化システムです。</p>
-    <div class="meta">
-      <span>バージョン: 1.0</span>
-      <span>作成日: 2026年5月</span>
-      <span>対象: 外部向け説明資料</span>
+    <div class="header-meta">
+      <span>
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.5V8L10.5 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        バージョン: 1.0
+      </span>
+      <span>
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5 2v2M11 2v2M2 7h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        作成日: 2026年5月
+      </span>
+      <span>
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5L10.2 6L15 6.7L11.5 10.1L12.4 15L8 12.6L3.6 15L4.5 10.1L1 6.7L5.8 6L8 1.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        対象: 外部向け説明資料
+      </span>
     </div>
   </div>
 </header>
@@ -296,8 +519,8 @@
 <div class="wrapper">
 
   <!-- 目次 -->
-  <nav class="toc">
-    <h3>目次</h3>
+  <nav class="toc fade-in-up" aria-label="目次">
+    <p class="toc-label">目次</p>
     <ol>
       <li><a href="#overview">システム概要</a></li>
       <li><a href="#features">主要機能</a></li>
@@ -315,8 +538,8 @@
        1. システム概要
   ═══════════════════════════════════════════ -->
   <section id="overview">
-    <h2>1. システム概要</h2>
-    <div class="card">
+    <h2 class="fade-in-up">1. システム概要</h2>
+    <div class="card fade-in-up delay-1">
       <p>
         本システムは、個人向け家計簿サービス <strong>MoneyForward ME</strong> から入出金明細・口座残高データを
         自動スクレイピングし、CSV ファイルの出力および <strong>Notion データベース</strong>への書き込みを
@@ -327,13 +550,13 @@
         30〜90 秒以内にデータ収集・同期を完了します。2 段階認証（OTP）の自動突破にも対応しており、
         <strong>人手を介さない完全自動運用</strong>が可能です。
       </p>
-      <div style="margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px;">
-        <span class="tag tag-blue">Python 3.11</span>
-        <span class="tag tag-blue">Playwright</span>
+      <div style="margin-top: 20px; display: flex; flex-wrap: wrap; gap: 6px;">
+        <span class="tag tag-midnight">Python 3.11</span>
+        <span class="tag tag-midnight">Playwright</span>
         <span class="tag tag-green">Notion API</span>
         <span class="tag tag-green">Notion Worker</span>
-        <span class="tag tag-yellow">GitHub Actions</span>
-        <span class="tag tag-yellow">Google Apps Script</span>
+        <span class="tag tag-amber">GitHub Actions</span>
+        <span class="tag tag-amber">Google Apps Script</span>
         <span class="tag tag-gray">TypeScript</span>
       </div>
     </div>
@@ -343,34 +566,34 @@
        2. 主要機能
   ═══════════════════════════════════════════ -->
   <section id="features">
-    <h2>2. 主要機能</h2>
+    <h2 class="fade-in-up">2. 主要機能</h2>
     <div class="grid-3">
-      <div class="feature-card">
+      <div class="feature-card fade-in-up delay-1">
         <span class="icon">🤖</span>
         <strong>自動スクレイピング</strong>
         <p>Playwright でブラウザを制御し、MoneyForward ME にログインして入出金明細・口座残高を自動取得します。</p>
       </div>
-      <div class="feature-card">
+      <div class="feature-card fade-in-up delay-2">
         <span class="icon">🔐</span>
         <strong>OTP 自動突破</strong>
         <p>Google Apps Script が Gmail からワンタイムパスワードを自動読み取り、2 段階認証を無人で突破します。</p>
       </div>
-      <div class="feature-card">
+      <div class="feature-card fade-in-up delay-3">
         <span class="icon">💾</span>
         <strong>セッション永続化</strong>
         <p>GitHub Actions キャッシュにセッションを保存し、毎回のログインを省略。処理時間を大幅に短縮します。</p>
       </div>
-      <div class="feature-card">
+      <div class="feature-card fade-in-up delay-4">
         <span class="icon">📅</span>
         <strong>柔軟な期間指定</strong>
         <p>今月・先月・今週・先週・指定月・任意期間の 6 モードに対応。Notion エージェントから自然言語で指定可能。</p>
       </div>
-      <div class="feature-card">
+      <div class="feature-card fade-in-up delay-5">
         <span class="icon">🗄️</span>
         <strong>Notion Upsert</strong>
         <p>取引日・金額・口座名をキーに重複チェックを行い、既存レコードは更新、新規は追加する Upsert 処理を実装。</p>
       </div>
-      <div class="feature-card">
+      <div class="feature-card fade-in-up delay-6">
         <span class="icon">📊</span>
         <strong>リアルタイム進捗</strong>
         <p>スクレイピング中の進捗を Notion ジョブ履歴ページへ随時反映。処理状況をリアルタイムで確認できます。</p>
@@ -382,63 +605,142 @@
        3. アーキテクチャ
   ═══════════════════════════════════════════ -->
   <section id="architecture">
-    <h2>3. システムアーキテクチャ</h2>
+    <h2 class="fade-in-up">3. システムアーキテクチャ</h2>
 
-    <div class="arch">
-      <pre>
-<span class="c-gray">┌──────────────────────────────────────────────────────────────────────────┐</span>
-<span class="c-gray">│                         MF 自動取得パイプライン                            │</span>
-<span class="c-gray">└──────────────────────────────────────────────────────────────────────────┘</span>
+    <div class="arch-visual fade-in-up delay-1">
 
-  <span class="c-yellow">【ユーザー操作レイヤー】</span>
-  ┌─────────────────────┐
-  │  Notion カスタム AI  │  ← ユーザーが自然言語で指示
-  │  エージェント (Chat) │     「先月の家計簿を取得して」
-  └──────────┬──────────┘
-             │ Tool Call
-             ▼
-  <span class="c-green">【Notion Worker レイヤー】</span>
-  ┌─────────────────────┐    ┌───────────────────────┐
-  │   Notion Worker     │───▶│ ジョブ実行履歴 DB       │
-  │  (TypeScript)       │    │  状態: 実行中 / 完了    │
-  │  mf-trigger-scraping│    │  取得期間・件数・URL    │
-  └──────────┬──────────┘    └───────────────────────┘
-             │ repository_dispatch
-             │ (GitHub API + GH_PAT)
-             ▼
-  <span class="c-blue">【CI/CD レイヤー】</span>
-  ┌─────────────────────────────────────────────────────┐
-  │            GitHub Actions (ubuntu-latest)            │
-  │                                                      │
-  │  1. Python 3.11 セットアップ                          │
-  │  2. Playwright Chromium インストール                  │
-  │  3. セッションキャッシュ復元 (actions/cache)           │
-  │  4. <span class="c-yellow">scraper/main.py</span> 実行                           │
-  │  5. セッションキャッシュ保存                           │
-  └──────────┬──────────────────────────────────────────┘
-             │
-      ┌──────┴──────┐
-      ▼             ▼
-  <span class="c-cyan">【スクレイパーレイヤー】</span>        <span class="c-pink">【OTP レイヤー (任意)】</span>
-  ┌─────────────────────┐    ┌───────────────────────┐
-  │  mf_scraper.py      │    │  Google Apps Script   │
-  │  (Playwright)       │◀──▶│  Gmail API            │
-  │                     │    │  OTP 6桁コード読み取り  │
-  │  ┌───────────────┐  │    └───────────────────────┘
-  │  │ MoneyForward  │  │
-  │  │  ME (Web)     │  │
-  │  └───────────────┘  │
-  └──────────┬──────────┘
-             │ ScrapingResult
-      ┌──────┴──────┐
-      ▼             ▼
-  <span class="c-green">【出力レイヤー】</span>
-  ┌──────────────┐    ┌────────────────────────────┐
-  │  CSV ファイル │    │  Notion 取引履歴 DB          │
-  │  (UTF-8 BOM) │    │  notion_writer.py (Upsert)  │
-  │  明細 / 残高  │    │  取引日・金額・口座・カテゴリ  │
-  └──────────────┘    └────────────────────────────┘
-      </pre>
+      <!-- Layer 1: ユーザー操作レイヤー -->
+      <div class="av-layer" style="border-left-color: var(--amber);">
+        <div class="av-badge" style="background: rgba(212,146,42,0.10); color: var(--amber-dark);">👤&ensp;ユーザー操作レイヤー</div>
+        <div style="display: flex; justify-content: center;">
+          <div class="av-node" style="max-width: 420px; width: 100%; text-align: center; padding: 18px 24px;">
+            <strong>🤖 Notion カスタム AI エージェント</strong>
+            <span>チャットから自然言語で取得期間を指示<br>例:「先月の家計簿を取得して」</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ↓ Tool Call -->
+      <div class="av-connector">
+        <div class="av-connector-line"></div>
+        <div class="av-connector-label">Tool Call</div>
+        <div class="av-connector-arrow">▼</div>
+      </div>
+
+      <!-- Layer 2: Notion Worker レイヤー -->
+      <div class="av-layer" style="border-left-color: #16a34a;">
+        <div class="av-badge" style="background: rgba(22,163,74,0.09); color: #14532d;">⚡&ensp;Notion Worker レイヤー</div>
+        <div class="av-row">
+          <div class="av-node" style="flex: 1;">
+            <strong>Notion Worker</strong>
+            <span>TypeScript / mf-trigger-scraping</span>
+          </div>
+          <div class="av-h-arrow">→</div>
+          <div class="av-node" style="flex: 1;">
+            <strong>ジョブ実行履歴 DB</strong>
+            <span>状態: 実行中 / 完了 / エラー<br>取得期間・件数・URL を記録</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ↓ repository_dispatch -->
+      <div class="av-connector">
+        <div class="av-connector-line"></div>
+        <div class="av-connector-label">repository_dispatch (GitHub API + GH_PAT)</div>
+        <div class="av-connector-arrow">▼</div>
+      </div>
+
+      <!-- Layer 3: CI/CD レイヤー -->
+      <div class="av-layer" style="border-left-color: var(--midnight);">
+        <div class="av-badge" style="background: rgba(11,32,52,0.07); color: var(--midnight);">⚙️&ensp;CI/CD レイヤー &mdash; GitHub Actions (ubuntu-latest)</div>
+        <div class="av-steps">
+          <div class="av-step">
+            <span class="av-step-num">① Python</span>
+            <span class="av-step-text">3.11 セットアップ + pip キャッシュ</span>
+          </div>
+          <div class="av-step-arrow">→</div>
+          <div class="av-step">
+            <span class="av-step-num">② Playwright</span>
+            <span class="av-step-text">Chromium + OS ライブラリ</span>
+          </div>
+          <div class="av-step-arrow">→</div>
+          <div class="av-step">
+            <span class="av-step-num">③ Session 復元</span>
+            <span class="av-step-text">actions/cache でログイン省略</span>
+          </div>
+          <div class="av-step-arrow">→</div>
+          <div class="av-step accent">
+            <span class="av-step-num">④ main.py 実行</span>
+            <span class="av-step-text">タイムアウト: 15 分</span>
+          </div>
+          <div class="av-step-arrow">→</div>
+          <div class="av-step">
+            <span class="av-step-num">⑤ Session 保存</span>
+            <span class="av-step-text">always() で常時実行</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ↓ -->
+      <div class="av-connector">
+        <div class="av-connector-line"></div>
+        <div class="av-connector-arrow">▼</div>
+      </div>
+
+      <!-- Layer 4: スクレイパー + OTP（並列） -->
+      <div class="av-split">
+        <div class="av-layer" style="border-left-color: #0891b2;">
+          <div class="av-badge" style="background: rgba(8,145,178,0.09); color: #155e75;">🕷️&ensp;スクレイパーレイヤー</div>
+          <div class="av-node" style="margin-bottom: 10px;">
+            <strong>mf_scraper.py</strong>
+            <span>Playwright / Chromium (headless)</span>
+          </div>
+          <div style="text-align: center; color: var(--cool-gray-dark); font-size: 12px; margin: 8px 0; line-height: 1;">▼</div>
+          <div class="av-node" style="background: rgba(11,32,52,0.055);">
+            <strong>MoneyForward ME</strong>
+            <span>Web ブラウザ自動操作で明細・残高を取得</span>
+          </div>
+        </div>
+
+        <div class="av-bidir" title="OTP コードを双方向でやり取り">↔</div>
+
+        <div class="av-layer" style="border-left-color: #db2777;">
+          <div class="av-badge" style="background: rgba(219,39,119,0.08); color: #831843;">🔑&ensp;OTP レイヤー（任意）</div>
+          <div class="av-node" style="margin-bottom: 10px;">
+            <strong>Google Apps Script</strong>
+            <span>Gmail API / WebApp エンドポイント</span>
+          </div>
+          <div style="text-align: center; color: var(--cool-gray-dark); font-size: 12px; margin: 8px 0; line-height: 1;">▼</div>
+          <div class="av-node" style="background: rgba(11,32,52,0.055);">
+            <strong>OTP 6桁コード</strong>
+            <span>直近10分のメールから正規表現で自動抽出</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ↓ ScrapingResult -->
+      <div class="av-connector">
+        <div class="av-connector-line"></div>
+        <div class="av-connector-label">ScrapingResult</div>
+        <div class="av-connector-arrow">▼</div>
+      </div>
+
+      <!-- Layer 5: 出力レイヤー -->
+      <div class="av-layer" style="border-left-color: #16a34a;">
+        <div class="av-badge" style="background: rgba(22,163,74,0.09); color: #14532d;">📤&ensp;出力レイヤー</div>
+        <div class="av-row">
+          <div class="av-node" style="flex: 1;">
+            <strong>📄 CSV ファイル</strong>
+            <span>明細 / 残高（UTF-8 BOM、Excel対応）</span>
+          </div>
+          <div style="color: var(--cool-gray-dark); font-weight: 600; padding: 0 14px; flex-shrink: 0; font-size: 1.1rem;">+</div>
+          <div class="av-node" style="flex: 1;">
+            <strong>🗄️ Notion 取引履歴 DB</strong>
+            <span>notion_writer.py による Upsert 書き込み</span>
+          </div>
+        </div>
+      </div>
+
     </div>
   </section>
 
@@ -446,10 +748,10 @@
        4. 処理フロー
   ═══════════════════════════════════════════ -->
   <section id="flow">
-    <h2>4. 処理フロー</h2>
+    <h2 class="fade-in-up">4. 処理フロー</h2>
 
     <h3>4-1. Notion エージェント経由の実行フロー</h3>
-    <div class="flow">
+    <div class="flow fade-in-up delay-1">
       <div class="flow-step">
         <div class="num">1</div>
         <strong>指示入力</strong>
@@ -481,8 +783,8 @@
       </div>
     </div>
 
-    <h3 style="margin-top: 32px;">4-2. ジョブ履歴の進捗更新タイミング</h3>
-    <div class="card">
+    <h3 style="margin-top: 36px;">4-2. ジョブ履歴の進捗更新タイミング</h3>
+    <div class="card fade-in-up delay-2">
       <div class="timeline">
         <div class="tl-item">
           <div class="tl-dot"></div>
@@ -510,7 +812,7 @@
           <p>処理済み件数・作成件数・更新件数・エラー件数を 5 件ごとに更新</p>
         </div>
         <div class="tl-item">
-          <div class="tl-dot" style="background: var(--success);"></div>
+          <div class="tl-dot tl-dot-success"></div>
           <strong>終了時</strong>
           <p>状態=完了（またはエラー）、完了日時、エラー詳細 を記録</p>
         </div>
@@ -522,38 +824,38 @@
        5. コンポーネント詳細
   ═══════════════════════════════════════════ -->
   <section id="components">
-    <h2>5. コンポーネント詳細</h2>
+    <h2 class="fade-in-up">5. コンポーネント詳細</h2>
 
-    <h3>5-1. Notion Worker（<code>worker/src/index.ts</code>）</h3>
-    <div class="card">
+    <h3>5-1. Notion Worker（<code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 7px;font-size:13px;">worker/src/index.ts</code>）</h3>
+    <div class="card fade-in-up delay-1">
       <p>Notion のカスタム AI エージェント機能である <strong>Notion Worker</strong> として動作する TypeScript モジュールです。</p>
-      <p>エージェントから <code>mf-trigger-scraping</code> ツールが呼び出されると、以下の 3 ステップを実行します。</p>
-      <ol style="padding-left: 20px; color: #334155; font-size: 14px; line-height: 2;">
+      <p>エージェントから <code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 7px;font-size:12px;">mf-trigger-scraping</code> ツールが呼び出されると、以下の 3 ステップを実行します。</p>
+      <ol style="padding-left: 22px; color: #334155; font-size: 14px; line-height: 2.1; margin: 12px 0;">
         <li>Notion API でジョブ実行履歴 DB にページを作成（状態: 実行中）</li>
-        <li>GitHub API の <code>repository_dispatch</code> でスクレイピングワークフローを起動</li>
+        <li>GitHub API の <code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 7px;font-size:12px;">repository_dispatch</code> でスクレイピングワークフローを起動</li>
         <li>ジョブページ ID と「started」ステータスをエージェントへ返答</li>
       </ol>
-      <div style="margin-top: 12px;">
+      <div style="margin-top: 14px;">
         <span class="tag tag-green">取得期間モード: 6 種類</span>
-        <span class="tag tag-blue">入力バリデーション付き</span>
+        <span class="tag tag-midnight">入力バリデーション付き</span>
         <span class="tag tag-gray">TypeScript / @notionhq/workers</span>
       </div>
     </div>
 
-    <h3>5-2. MoneyForward スクレイパー（<code>scraper/mf_scraper.py</code>）</h3>
-    <div class="card">
+    <h3>5-2. MoneyForward スクレイパー（<code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 7px;font-size:13px;">scraper/mf_scraper.py</code>）</h3>
+    <div class="card fade-in-up delay-2">
       <p>Playwright を使ってヘッドレス Chromium ブラウザを操作し、MoneyForward ME からデータを取得するコアモジュールです。</p>
-      <div class="grid-2" style="margin-top: 16px;">
+      <div class="grid-2" style="margin-top: 18px;">
         <div>
-          <h3 style="font-size: 0.9rem; margin-top: 0;">セッション管理</h3>
+          <h3 style="font-size: 0.9rem; margin-top: 0; color: var(--midnight);">セッション管理</h3>
           <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2;">
-            <li>初回ログイン後に <code>session.json</code> へクッキーを保存</li>
+            <li>初回ログイン後に <code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 6px;font-size:12px;">session.json</code> へクッキーを保存</li>
             <li>次回以降はセッションを再利用し、ログインをスキップ</li>
             <li>セッション切れを自動検知して再ログイン</li>
           </ul>
         </div>
         <div>
-          <h3 style="font-size: 0.9rem; margin-top: 0;">2段階認証（OTP）</h3>
+          <h3 style="font-size: 0.9rem; margin-top: 0; color: var(--midnight);">2段階認証（OTP）</h3>
           <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2;">
             <li>GAS WebApp に 3 秒間隔で最大 10 回ポーリング</li>
             <li>6 桁コード取得後に自動入力・送信</li>
@@ -563,29 +865,29 @@
       </div>
     </div>
 
-    <h3>5-3. Notion ライター（<code>scraper/notion_writer.py</code>）</h3>
-    <div class="card">
+    <h3>5-3. Notion ライター（<code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 7px;font-size:13px;">scraper/notion_writer.py</code>）</h3>
+    <div class="card fade-in-up delay-3">
       <p>取得したトランザクションデータを Notion 取引履歴 DB へ書き込むモジュールです。</p>
-      <div class="grid-2" style="margin-top: 16px;">
+      <div class="grid-2" style="margin-top: 18px;">
         <div>
-          <h3 style="font-size: 0.9rem; margin-top: 0;">Upsert ロジック</h3>
+          <h3 style="font-size: 0.9rem; margin-top: 0; color: var(--midnight);">Upsert ロジック</h3>
           <p style="font-size: 14px;">ユニークキー（<strong>取引日 + 金額 + 口座名</strong>）で既存レコードを検索し、存在する場合は更新、しない場合は新規作成します。</p>
         </div>
         <div>
-          <h3 style="font-size: 0.9rem; margin-top: 0;">スキーマ検証</h3>
+          <h3 style="font-size: 0.9rem; margin-top: 0; color: var(--midnight);">スキーマ検証</h3>
           <p style="font-size: 14px;">スクレイピング開始前に Notion DB のアクセス権・必須プロパティ・プロパティ型を自動検証し、不備があれば即座にエラーで停止します。</p>
         </div>
       </div>
-      <div class="notice notice-info" style="margin-top: 16px;">
+      <div class="notice notice-info" style="margin-top: 18px;">
         <span class="notice-icon">ℹ️</span>
         <span>Notion API のレート制限（3 req/s）に対応するため、1 件の書き込みごとに 0.4 秒の待機を挿入しています。</span>
       </div>
     </div>
 
-    <h3>5-4. GAS OTP リーダー（<code>gas/otp_reader.gs</code>）</h3>
-    <div class="card">
+    <h3>5-4. GAS OTP リーダー（<code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 7px;font-size:13px;">gas/otp_reader.gs</code>）</h3>
+    <div class="card fade-in-up delay-4">
       <p>Google Apps Script を Gmail に接続し、MoneyForward ID からのメール認証コードを自動取得する Web アプリです。</p>
-      <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2;">
+      <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2.1;">
         <li>直近 10 分以内の MoneyForward ID 認証メールを検索</li>
         <li>本文から 6 桁のコードを正規表現で抽出</li>
         <li>取得済みメールを既読にして誤取得を防止</li>
@@ -593,10 +895,10 @@
       </ul>
     </div>
 
-    <h3>5-5. GitHub Actions ワークフロー（<code>.github/workflows/scrape.yml</code>）</h3>
-    <div class="card">
-      <p>スクレイピング処理を実行する CI/CD パイプラインです。Notion Worker からの <code>repository_dispatch</code> と GitHub UI からの <code>workflow_dispatch</code> の両方をトリガーとして受け付けます。</p>
-      <div class="tbl-wrap" style="margin-top: 12px;">
+    <h3>5-5. GitHub Actions ワークフロー（<code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 7px;font-size:13px;">.github/workflows/scrape.yml</code>）</h3>
+    <div class="card fade-in-up delay-5">
+      <p>スクレイピング処理を実行する CI/CD パイプラインです。Notion Worker からの <code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 7px;font-size:12px;">repository_dispatch</code> と GitHub UI からの <code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 7px;font-size:12px;">workflow_dispatch</code> の両方をトリガーとして受け付けます。</p>
+      <div class="tbl-wrap" style="margin-top: 14px;">
         <table>
           <thead>
             <tr><th>ステップ</th><th>内容</th><th>備考</th></tr>
@@ -619,10 +921,10 @@
        6. データモデル
   ═══════════════════════════════════════════ -->
   <section id="data-model">
-    <h2>6. データモデル</h2>
+    <h2 class="fade-in-up">6. データモデル</h2>
 
     <h3>6-1. Notion 取引履歴 DB（必須プロパティ）</h3>
-    <div class="tbl-wrap">
+    <div class="tbl-wrap fade-in-up delay-1">
       <table>
         <thead>
           <tr><th>プロパティ名</th><th>型</th><th>説明</th><th>備考</th></tr>
@@ -642,7 +944,7 @@
     </div>
 
     <h3>6-2. ジョブ実行履歴 DB</h3>
-    <div class="tbl-wrap">
+    <div class="tbl-wrap fade-in-up delay-2">
       <table>
         <thead>
           <tr><th>プロパティ名</th><th>型</th><th>説明</th></tr>
@@ -662,9 +964,9 @@
     </div>
 
     <h3>6-3. CSV 出力形式</h3>
-    <div class="grid-2">
+    <div class="grid-2 fade-in-up delay-3">
       <div>
-        <p style="font-size: 14px; font-weight: 600; margin-bottom: 6px;">取引明細 CSV（<code>transactions_YYYYMMDD_YYYYMMDD.csv</code>）</p>
+        <p style="font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--midnight);">取引明細 CSV（<code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 6px;font-size:12px;">transactions_YYYYMMDD_YYYYMMDD.csv</code>）</p>
         <div class="code-block">
           <pre><span class="comment"># UTF-8 BOM / Excel 対応</span>
 <span class="str">取引日,金額,カテゴリ,サブカテゴリ,口座,メモ</span>
@@ -673,7 +975,7 @@
         </div>
       </div>
       <div>
-        <p style="font-size: 14px; font-weight: 600; margin-bottom: 6px;">口座残高 CSV（<code>balances_YYYYMMDD_YYYYMMDD.csv</code>）</p>
+        <p style="font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--midnight);">口座残高 CSV（<code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 6px;font-size:12px;">balances_YYYYMMDD_YYYYMMDD.csv</code>）</p>
         <div class="code-block">
           <pre><span class="comment"># UTF-8 BOM / Excel 対応</span>
 <span class="str">口座名,残高,更新日時</span>
@@ -688,33 +990,33 @@
        7. セキュリティ設計
   ═══════════════════════════════════════════ -->
   <section id="security">
-    <h2>7. セキュリティ設計</h2>
+    <h2 class="fade-in-up">7. セキュリティ設計</h2>
 
-    <div class="notice notice-danger">
+    <div class="notice notice-danger fade-in-up delay-1">
       <span class="notice-icon">🔒</span>
       <span><strong>重要:</strong> MoneyForward のログイン情報・Notion トークン・GitHub PAT はすべて GitHub Secrets で管理し、コードベースには一切含まれません。</span>
     </div>
 
-    <div class="grid-2" style="margin-top: 16px;">
+    <div class="grid-2 fade-in-up delay-2" style="margin-top: 20px;">
       <div class="card">
         <h3 style="margin-top: 0;">認証情報の管理</h3>
-        <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2;">
-          <li><code>.env</code> と <code>session.json</code> は <code>.gitignore</code> で除外済み</li>
+        <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2.1;">
+          <li><code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 6px;font-size:12px;">.env</code> と <code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 6px;font-size:12px;">session.json</code> は <code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 6px;font-size:12px;">.gitignore</code> で除外済み</li>
           <li>GitHub Actions では Secrets として注入（ログに出力されない）</li>
-          <li>GAS には <code>SECRET</code> トークンによるアクセス認証を実装</li>
+          <li>GAS には <code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 6px;font-size:12px;">SECRET</code> トークンによるアクセス認証を実装</li>
         </ul>
       </div>
       <div class="card">
         <h3 style="margin-top: 0;">権限の最小化</h3>
-        <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2;">
-          <li>Actions ジョブの権限は <code>contents: read</code> と <code>actions: write</code>（キャッシュ保存のため）</li>
+        <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2.1;">
+          <li>Actions ジョブの権限は <code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 6px;font-size:12px;">contents: read</code> と <code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 6px;font-size:12px;">actions: write</code>（キャッシュ保存のため）</li>
           <li>Notion Integration は必要な DB のみに共有</li>
           <li>GAS は Gmail 読み取り権限のみ使用</li>
         </ul>
       </div>
     </div>
 
-    <div class="notice notice-warn" style="margin-top: 16px;">
+    <div class="notice notice-warn fade-in-up delay-3" style="margin-top: 20px;">
       <span class="notice-icon">⚠️</span>
       <span>本システムは MoneyForward ME の個人利用を対象として設計されています。利用にあたっては MoneyForward ME の利用規約を遵守してください。</span>
     </div>
@@ -724,10 +1026,10 @@
        8. セットアップ要件
   ═══════════════════════════════════════════ -->
   <section id="setup">
-    <h2>8. セットアップ要件</h2>
+    <h2 class="fade-in-up">8. セットアップ要件</h2>
 
     <h3>必須の外部サービス・アカウント</h3>
-    <div class="tbl-wrap">
+    <div class="tbl-wrap fade-in-up delay-1">
       <table>
         <thead>
           <tr><th>サービス</th><th>用途</th><th>必要な権限</th><th>必須/任意</th></tr>
@@ -755,14 +1057,14 @@
             <td>Google Apps Script</td>
             <td>Gmail OTP の自動読み取り</td>
             <td>Gmail API（Gmail アカウント）</td>
-            <td><span class="tag tag-yellow">任意</span></td>
+            <td><span class="tag tag-amber">任意</span></td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <h3>環境変数一覧</h3>
-    <div class="code-block">
+    <div class="code-block fade-in-up delay-2">
       <pre><span class="comment"># ── MoneyForward ME ログイン情報（必須）──────────────────────</span>
 <span class="key">MF_EMAIL</span>=<span class="str">your_email@example.com</span>
 <span class="key">MF_PASSWORD</span>=<span class="str">your_password</span>
@@ -782,23 +1084,23 @@
     </div>
 
     <h3>ファイル構成</h3>
-    <div class="code-block">
+    <div class="code-block fade-in-up delay-3">
       <pre><span class="comment">mf-automation/</span>
-<span class="c-blue">├── .env.example</span>              <span class="comment"># 環境変数テンプレート</span>
-<span class="c-blue">├── Makefile</span>                  <span class="comment"># ローカル操作コマンド集</span>
-<span class="c-blue">├── requirements.txt</span>          <span class="comment"># Python 依存パッケージ</span>
-<span class="c-green">├── gas/</span>
-<span class="c-green">│   ├── appsscript.json</span>       <span class="comment"># GAS マニフェスト</span>
-<span class="c-green">│   └── otp_reader.gs</span>         <span class="comment"># OTP 取得スクリプト</span>
-<span class="c-yellow">├── scraper/</span>
-<span class="c-yellow">│   ├── main.py</span>               <span class="comment"># CLI エントリポイント</span>
-<span class="c-yellow">│   ├── mf_scraper.py</span>         <span class="comment"># スクレイパー本体（Playwright）</span>
-<span class="c-yellow">│   ├── notion_writer.py</span>      <span class="comment"># Notion Upsert モジュール</span>
-<span class="c-yellow">│   └── tests/</span>                <span class="comment"># ユニット / 統合テスト</span>
-<span class="c-pink">├── worker/</span>
-<span class="c-pink">│   └── src/index.ts</span>          <span class="comment"># Notion Worker（TypeScript）</span>
-<span class="c-blue">└── .github/workflows/</span>
-<span class="c-blue">    └── scrape.yml</span>             <span class="comment"># GitHub Actions パイプライン</span></pre>
+<span class="key">├── .env.example</span>              <span class="comment"># 環境変数テンプレート</span>
+<span class="key">├── Makefile</span>                  <span class="comment"># ローカル操作コマンド集</span>
+<span class="key">├── requirements.txt</span>          <span class="comment"># Python 依存パッケージ</span>
+<span class="val">├── gas/</span>
+<span class="val">│   ├── appsscript.json</span>       <span class="comment"># GAS マニフェスト</span>
+<span class="val">│   └── otp_reader.gs</span>         <span class="comment"># OTP 取得スクリプト</span>
+<span class="str">├── scraper/</span>
+<span class="str">│   ├── main.py</span>               <span class="comment"># CLI エントリポイント</span>
+<span class="str">│   ├── mf_scraper.py</span>         <span class="comment"># スクレイパー本体（Playwright）</span>
+<span class="str">│   ├── notion_writer.py</span>      <span class="comment"># Notion Upsert モジュール</span>
+<span class="str">│   └── tests/</span>                <span class="comment"># ユニット / 統合テスト</span>
+<span class="comment">├── worker/</span>
+<span class="comment">│   └── src/index.ts</span>          <span class="comment"># Notion Worker（TypeScript）</span>
+<span class="key">└── .github/workflows/</span>
+<span class="key">    └── scrape.yml</span>             <span class="comment"># GitHub Actions パイプライン</span></pre>
     </div>
   </section>
 
@@ -806,10 +1108,10 @@
        9. 運用・監視
   ═══════════════════════════════════════════ -->
   <section id="operation">
-    <h2>9. 運用・監視</h2>
+    <h2 class="fade-in-up">9. 運用・監視</h2>
 
     <h3>実行モード一覧</h3>
-    <div class="tbl-wrap">
+    <div class="tbl-wrap fade-in-up delay-1">
       <table>
         <thead>
           <tr><th>モード</th><th>説明</th><th>追加パラメータ</th></tr>
@@ -826,20 +1128,20 @@
     </div>
 
     <h3>テスト構成</h3>
-    <div class="grid-2">
+    <div class="grid-2 fade-in-up delay-2">
       <div class="card">
         <h3 style="margin-top: 0; font-size: 0.95rem;">ユニットテスト（37 件）</h3>
-        <p style="font-size: 14px;">日付範囲ロジック・金額パース・日付パース・Notion スキーマ処理をブラウザ不要で検証。<br><code>make test</code> で実行。</p>
+        <p style="font-size: 14px;">日付範囲ロジック・金額パース・日付パース・Notion スキーマ処理をブラウザ不要で検証。<br><code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 6px;font-size:12px;">make test</code> で実行。</p>
       </div>
       <div class="card">
         <h3 style="margin-top: 0; font-size: 0.95rem;">統合シナリオテスト（5 種）</h3>
-        <p style="font-size: 14px;">実ブラウザ・実アカウントを使用した End-to-End テスト。<code>make scenario</code> で実行。S03（手動 OTP フォールバック）は手動実行のみ。</p>
+        <p style="font-size: 14px;">実ブラウザ・実アカウントを使用した End-to-End テスト。<code style="background:rgba(11,32,52,0.07);border-radius:4px;padding:1px 6px;font-size:12px;">make scenario</code> で実行。S03（手動 OTP フォールバック）は手動実行のみ。</p>
       </div>
     </div>
 
     <h3>エラー時の挙動</h3>
-    <div class="card">
-      <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2.2;">
+    <div class="card fade-in-up delay-3">
+      <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2.3;">
         <li>スクレイピング中に例外が発生した場合、Notion ジョブページの状態を <strong>「エラー」</strong> に更新し、エラー詳細（最大 2000 文字）を記録します。</li>
         <li>Notion DB のスキーマ不備（必須プロパティ欠落・型不一致）はスクレイピング開始前に検出し、即座にエラーで停止します。</li>
         <li>GitHub Actions の実行ログ URL がジョブページに記録されるため、失敗時のデバッグが容易です。</li>
@@ -848,9 +1150,9 @@
       </ul>
     </div>
 
-    <div class="notice notice-info" style="margin-top: 16px;">
+    <div class="notice notice-info fade-in-up delay-4" style="margin-top: 20px;">
       <span class="notice-icon">💡</span>
-      <span>MoneyForward のページ構造（HTML セレクタ）が変更された場合は、<code>scraper/mf_scraper.py</code> 内のセレクタ定義を更新する必要があります。</span>
+      <span>MoneyForward のページ構造（HTML セレクタ）が変更された場合は、<code style="background:rgba(11,32,52,0.10);border-radius:4px;padding:1px 6px;font-size:12px;">scraper/mf_scraper.py</code> 内のセレクタ定義を更新する必要があります。</span>
     </div>
   </section>
 
@@ -858,9 +1160,24 @@
 
 <!-- フッター -->
 <footer>
-  <p>MF自動取得パイプライン — 技術概要ドキュメント</p>
-  <p style="margin-top: 4px;">作成日: 2026年5月 &nbsp;|&nbsp; 本資料は外部向け説明用です</p>
+  <p style="color: var(--cool-gray); font-weight: 600; font-size: 14px; margin-bottom: 6px;">MF自動取得パイプライン</p>
+  <p>技術概要ドキュメント &nbsp;|&nbsp; 作成日: 2026年5月 &nbsp;|&nbsp; 本資料は外部向け説明用です</p>
 </footer>
+
+<script>
+  // スクロールアニメーション
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in-view');
+        }
+      });
+    },
+    { threshold: 0.08, rootMargin: '0px 0px -40px 0px' }
+  );
+  document.querySelectorAll('.fade-in-up').forEach((el) => observer.observe(el));
+</script>
 
 </body>
 </html>
