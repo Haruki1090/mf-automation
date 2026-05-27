@@ -12,6 +12,12 @@ from mf_scraper import Transaction
 
 ProgressCallback = Callable[[dict], None]
 
+_RE_DATE_FULL = re.compile(r"(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})")
+_RE_DATE_SHORT = re.compile(r"(\d{1,2})[/\-](\d{1,2})")
+
+# Notion API レート制限: 3 req/s を安全に下回る間隔
+_NOTION_MIN_INTERVAL = 0.35
+
 
 class NotionWriter:
     ACCOUNT_ALIASES = {
@@ -33,6 +39,9 @@ class NotionWriter:
     OPTIONAL_TRANSACTION_PROPERTIES = {
         "ジョブID": "rich_text",
     }
+
+    # 口座名正規化キャッシュ（プロセス内で共有）
+    _account_normalize_cache: dict[str, str] = {}
 
     def __init__(self, token: str, db_id: str):
         self.client = Client(auth=token)
@@ -111,6 +120,9 @@ class NotionWriter:
         progress_interval: int = 5,
     ) -> dict:
         """取引データをUpsert（作成 or 更新）する"""
+        # 重複排除（同一取引の二重書き込みを防ぐ）
+        transactions = self._deduplicate(transactions)
+
         created = 0
         updated = 0
         errors = 0
@@ -127,20 +139,39 @@ class NotionWriter:
             error_count=errors,
         )
 
+        # 既存レコードを一括取得してN+1クエリを回避
+        existing_map: Optional[dict] = None
+        try:
+            existing_map = self._prefetch_existing(transactions)
+        except Exception as e:
+            print(f"[Notion] 一括取得失敗。個別検索にフォールバックします: {e}")
+
+        # レート制限: 前回呼び出し時刻を追跡してAPIコール間隔を動的に調整
+        last_api_call = time.monotonic() - _NOTION_MIN_INTERVAL
+
         for index, tx in enumerate(transactions, start=1):
             try:
-                existing = self._find_existing(tx)
+                elapsed = time.monotonic() - last_api_call
+                wait = max(0.0, _NOTION_MIN_INTERVAL - elapsed)
+                if wait > 0:
+                    time.sleep(wait)
+
+                if existing_map is not None:
+                    existing = self._lookup_existing(tx, existing_map)
+                else:
+                    existing = self._find_existing(tx)
+
                 if existing:
                     self._update_page(existing["id"], tx, scraped_at, job_page_id)
                     updated += 1
                 else:
                     self._create_page(tx, scraped_at, job_page_id)
                     created += 1
-                # Notion API レート制限対策（3req/s）
-                time.sleep(0.4)
+                last_api_call = time.monotonic()
             except Exception as e:
                 print(f"[Notion] エラー: {tx.date} {tx.amount}円 - {e}")
                 errors += 1
+                last_api_call = time.monotonic()
 
             if index == total or index % max(progress_interval, 1) == 0:
                 self._emit_progress(
@@ -167,8 +198,95 @@ class NotionWriter:
         except Exception as e:
             print(f"[Notion] 進捗通知をスキップしました: {e}")
 
+    @staticmethod
+    def _deduplicate(transactions: list[Transaction]) -> list[Transaction]:
+        """(日付, 金額, 口座, メモ) をキーにして重複取引を除去する"""
+        seen: dict[tuple, Transaction] = {}
+        for tx in transactions:
+            key = (tx.date, tx.amount, tx.account, tx.memo)
+            if key not in seen:
+                seen[key] = tx
+        return list(seen.values())
+
+    def _prefetch_existing(self, transactions: list[Transaction]) -> dict[tuple, dict]:
+        """日付範囲内の既存Notionレコードを一括取得してN+1クエリを回避する"""
+        if not transactions:
+            return {}
+
+        dates = []
+        for tx in transactions:
+            try:
+                dates.append(self._parse_date(tx.date))
+            except ValueError:
+                pass
+        if not dates:
+            return {}
+
+        min_date = min(dates)
+        max_date = max(dates)
+        print(f"[Notion] 既存データ一括取得: {min_date} 〜 {max_date}")
+
+        existing_map: dict[tuple, dict] = {}
+        start_cursor: Optional[str] = None
+        page_count = 0
+
+        while True:
+            query_kwargs: dict = {
+                "database_id": self.db_id,
+                "filter": {
+                    "and": [
+                        {"property": "取引日", "date": {"on_or_after": min_date}},
+                        {"property": "取引日", "date": {"on_or_before": max_date}},
+                    ]
+                },
+                "page_size": 100,
+            }
+            if start_cursor:
+                query_kwargs["start_cursor"] = start_cursor
+
+            response = self.client.databases.query(**query_kwargs)
+            page_count += 1
+
+            for record in response.get("results", []):
+                props = record.get("properties", {})
+                date_prop = (props.get("取引日") or {}).get("date") or {}
+                date_str = date_prop.get("start")
+                amount = (props.get("金額") or {}).get("number")
+                account_select = (props.get("口座") or {}).get("select") or {}
+                account = account_select.get("name")
+
+                if date_str and amount is not None and account:
+                    key: tuple = (date_str, amount, account)
+                    if key not in existing_map:
+                        existing_map[key] = record
+
+            if not response.get("has_more"):
+                break
+            start_cursor = response.get("next_cursor")
+            time.sleep(_NOTION_MIN_INTERVAL)
+
+        print(f"[Notion] 既存データ {len(existing_map)} 件取得完了 ({page_count} ページ)")
+        return existing_map
+
+    def _lookup_existing(self, tx: Transaction, existing_map: dict[tuple, dict]) -> Optional[dict]:
+        """事前取得キャッシュから既存レコードを検索する"""
+        date_str = self._parse_date(tx.date)
+        normalized = self.normalize_account(tx.account)
+        raw = " ".join((tx.account or "").split())
+
+        key = (date_str, tx.amount, normalized)
+        if key in existing_map:
+            return existing_map[key]
+
+        if raw != normalized:
+            key2 = (date_str, tx.amount, raw)
+            if key2 in existing_map:
+                return existing_map[key2]
+
+        return None
+
     def _find_existing(self, tx: Transaction) -> Optional[dict]:
-        """ユニークキー（取引日 + 金額 + 口座名）で既存ページを検索"""
+        """ユニークキー（取引日 + 金額 + 口座名）で既存ページを検索（フォールバック用）"""
         response = self.client.databases.query(
             database_id=self.db_id,
             filter={
@@ -214,15 +332,23 @@ class NotionWriter:
 
     @classmethod
     def normalize_account(cls, account: str) -> str:
+        cached = cls._account_normalize_cache.get(account)
+        if cached is not None:
+            return cached
+
         normalized = " ".join((account or "").split())
         if not normalized:
-            return "不明"
+            result = "不明"
+        else:
+            key = cls._account_alias_key(normalized)
+            result = normalized
+            for canonical, aliases in cls.ACCOUNT_ALIASES.items():
+                if key in aliases:
+                    result = canonical
+                    break
 
-        key = cls._account_alias_key(normalized)
-        for canonical, aliases in cls.ACCOUNT_ALIASES.items():
-            if key in aliases:
-                return canonical
-        return normalized
+        cls._account_normalize_cache[account] = result
+        return result
 
     @classmethod
     def _account_filter(cls, tx: Transaction) -> dict:
@@ -257,13 +383,11 @@ class NotionWriter:
         """MM/DD や YYYY/MM/DD 形式を YYYY-MM-DD に変換"""
         date_str = date_str.strip()
 
-        # YYYY/MM/DD または YYYY-MM-DD
-        m = re.match(r"(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})", date_str)
+        m = _RE_DATE_FULL.match(date_str)
         if m:
             return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
 
-        # MM/DD（当年として処理）
-        m = re.match(r"(\d{1,2})[/\-](\d{1,2})", date_str)
+        m = _RE_DATE_SHORT.match(date_str)
         if m:
             year = datetime.now().year
             return f"{year}-{int(m.group(1)):02d}-{int(m.group(2)):02d}"

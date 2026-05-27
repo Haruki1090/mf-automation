@@ -14,6 +14,10 @@ from pathlib import Path
 from typing import Callable, Optional
 from playwright.sync_api import sync_playwright, Page, BrowserContext, TimeoutError as PlaywrightTimeoutError
 
+# 事前コンパイル済み正規表現
+_RE_TX_DATE_FULL = re.compile(r"(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})")
+_RE_TX_DATE_SHORT = re.compile(r"(\d{1,2})[/\-](\d{1,2})")
+
 SESSION_FILE = Path(__file__).parent / "session.json"
 
 
@@ -335,10 +339,10 @@ class MoneyForwardScraper:
         date_range: Optional[DateRange] = None,
     ) -> Optional[date]:
         """明細の日付文字列を date オブジェクトに変換。パース失敗時は None を返す。"""
-        m = re.match(r"(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})", date_text)
+        m = _RE_TX_DATE_FULL.match(date_text)
         if m:
             return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-        m = re.match(r"(\d{1,2})[/\-](\d{1,2})", date_text)
+        m = _RE_TX_DATE_SHORT.match(date_text)
         if m:
             month = int(m.group(1))
             day = int(m.group(2))
@@ -365,7 +369,11 @@ class MoneyForwardScraper:
 
         print(f"[CF] 入出金明細ページへ移動... ({date_range})")
         page.goto(url, wait_until="domcontentloaded")
-        page.wait_for_timeout(3000)
+        # テーブルが現れたら即続行（最大10秒）、タイムアウト時はフォールバック
+        try:
+            page.wait_for_selector("#cf-detail-table", timeout=10000)
+        except PlaywrightTimeoutError:
+            page.wait_for_timeout(2000)
         self._handle_account_selection(page)
 
         transactions: list[Transaction] = []
@@ -444,7 +452,11 @@ class MoneyForwardScraper:
         """資産・口座残高を取得"""
         print("[Assets] 資産状況ページへ移動...")
         page.goto(MF_ACCOUNTS_URL, wait_until="domcontentloaded")
-        page.wait_for_timeout(2000)
+        # テーブルが現れたら即続行（最大8秒）、タイムアウト時はフォールバック
+        try:
+            page.wait_for_selector("#account-table", timeout=8000)
+        except PlaywrightTimeoutError:
+            page.wait_for_timeout(1500)
         self._handle_account_selection(page)
 
         balances: list[AssetBalance] = []
