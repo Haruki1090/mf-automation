@@ -8,6 +8,9 @@
     /* ── リセット＆ベース ─────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
     body {
       font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", sans-serif;
       font-size: 15px;
@@ -704,7 +707,7 @@
       <div class="card">
         <h3 style="margin-top: 0;">権限の最小化</h3>
         <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2;">
-          <li>Actions ジョブの権限は <code>contents: read</code> のみ</li>
+          <li>Actions ジョブの権限は <code>contents: read</code> と <code>actions: write</code>（キャッシュ保存のため）</li>
           <li>Notion Integration は必要な DB のみに共有</li>
           <li>GAS は Gmail 読み取り権限のみ使用</li>
         </ul>
