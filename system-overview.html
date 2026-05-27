@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MF自動取得パイプライン — システム概要</title>
+  <style>
+    /* ── リセット＆ベース ─────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.75;
+      color: #1a1a2e;
+      background: #f5f7fb;
+    }
+
+    /* ── カラー変数 ──────────────────────────────── */
+    :root {
+      --primary:   #2563eb;
+      --primary-d: #1d4ed8;
+      --accent:    #0ea5e9;
+      --success:   #16a34a;
+      --warn:      #d97706;
+      --danger:    #dc2626;
+      --surface:   #ffffff;
+      --border:    #e2e8f0;
+      --muted:     #64748b;
+      --code-bg:   #0f172a;
+    }
+
+    /* ── レイアウト ──────────────────────────────── */
+    .wrapper { max-width: 960px; margin: 0 auto; padding: 0 24px 80px; }
+
+    /* ── ヘッダー ────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #0ea5e9 100%);
+      color: #fff;
+      padding: 56px 32px 48px;
+      clip-path: polygon(0 0, 100% 0, 100% 88%, 0 100%);
+      margin-bottom: 48px;
+    }
+    header .inner { max-width: 960px; margin: 0 auto; }
+    header .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 999px;
+      font-size: 12px;
+      padding: 3px 14px;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+    }
+    header h1 { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
+    header p  { margin-top: 12px; opacity: 0.88; max-width: 640px; font-size: 1rem; }
+    header .meta { margin-top: 20px; display: flex; gap: 24px; flex-wrap: wrap; opacity: 0.75; font-size: 13px; }
+
+    /* ── セクション ──────────────────────────────── */
+    section { margin-bottom: 48px; }
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--primary-d);
+      border-left: 4px solid var(--primary);
+      padding-left: 14px;
+      margin-bottom: 20px;
+    }
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin: 24px 0 10px;
+    }
+    p { margin-bottom: 12px; color: #334155; }
+
+    /* ── カード ──────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px 28px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .card + .card { margin-top: 16px; }
+
+    /* ── グリッド ────────────────────────────────── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    @media (max-width: 700px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+
+    /* ── 特徴カード ──────────────────────────────── */
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 22px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .feature-card .icon {
+      font-size: 1.8rem;
+      margin-bottom: 10px;
+      display: block;
+    }
+    .feature-card strong { display: block; font-size: 1rem; margin-bottom: 6px; color: #0f172a; }
+    .feature-card p { font-size: 0.88rem; margin: 0; color: var(--muted); }
+
+    /* ── アーキテクチャ図 ────────────────────────── */
+    .arch {
+      background: var(--code-bg);
+      border-radius: 12px;
+      padding: 28px 32px;
+      overflow-x: auto;
+    }
+    .arch pre {
+      font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+      font-size: 13px;
+      line-height: 1.65;
+      color: #e2e8f0;
+      white-space: pre;
+    }
+    .arch .c-blue   { color: #60a5fa; }
+    .arch .c-green  { color: #4ade80; }
+    .arch .c-yellow { color: #fbbf24; }
+    .arch .c-cyan   { color: #67e8f9; }
+    .arch .c-pink   { color: #f472b6; }
+    .arch .c-gray   { color: #94a3b8; }
+
+    /* ── フロー図 ─────────────────────────────────── */
+    .flow {
+      display: flex;
+      align-items: stretch;
+      flex-wrap: wrap;
+      gap: 0;
+      margin: 16px 0;
+    }
+    .flow-step {
+      flex: 1;
+      min-width: 120px;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      text-align: center;
+      position: relative;
+    }
+    .flow-step .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .flow-step strong { display: block; font-size: 0.88rem; color: #0f172a; }
+    .flow-step span   { font-size: 0.78rem; color: var(--muted); }
+    .flow-arrow {
+      display: flex;
+      align-items: center;
+      color: var(--accent);
+      font-size: 1.4rem;
+      padding: 0 6px;
+    }
+
+    /* ── テーブル ────────────────────────────────── */
+    .tbl-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); font-size: 14px; }
+    thead { background: #f1f5f9; }
+    th, td { padding: 10px 16px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { font-weight: 700; color: #475569; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+    td code { background: #f1f5f9; border-radius: 4px; padding: 1px 6px; font-size: 12px; font-family: monospace; }
+
+    /* ── コードブロック ──────────────────────────── */
+    .code-block {
+      background: var(--code-bg);
+      border-radius: 10px;
+      padding: 20px 24px;
+      overflow-x: auto;
+      margin: 12px 0;
+    }
+    .code-block pre {
+      font-family: "JetBrains Mono", "Fira Code", monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #e2e8f0;
+    }
+    .code-block .comment { color: #64748b; }
+    .code-block .key     { color: #60a5fa; }
+    .code-block .val     { color: #4ade80; }
+    .code-block .str     { color: #fbbf24; }
+
+    /* ── バッジ ──────────────────────────────────── */
+    .tag {
+      display: inline-block;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 10px;
+      margin: 2px;
+    }
+    .tag-blue   { background: #dbeafe; color: #1d4ed8; }
+    .tag-green  { background: #dcfce7; color: #15803d; }
+    .tag-yellow { background: #fef9c3; color: #a16207; }
+    .tag-red    { background: #fee2e2; color: #b91c1c; }
+    .tag-gray   { background: #f1f5f9; color: #475569; }
+
+    /* ── タイムライン ────────────────────────────── */
+    .timeline { border-left: 3px solid var(--border); padding-left: 24px; }
+    .tl-item { position: relative; padding-bottom: 20px; }
+    .tl-item:last-child { padding-bottom: 0; }
+    .tl-dot {
+      position: absolute;
+      left: -32px;
+      top: 4px;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: 3px solid var(--surface);
+      box-shadow: 0 0 0 2px var(--primary);
+    }
+    .tl-item strong { font-size: 0.9rem; color: #0f172a; }
+    .tl-item p { font-size: 0.85rem; color: var(--muted); margin: 2px 0 0; }
+
+    /* ── 注意書き ────────────────────────────────── */
+    .notice {
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 0.88rem;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin: 12px 0;
+    }
+    .notice-warn  { background: #fffbeb; border: 1px solid #fcd34d; color: #78350f; }
+    .notice-info  { background: #eff6ff; border: 1px solid #93c5fd; color: #1e3a8a; }
+    .notice-danger{ background: #fef2f2; border: 1px solid #fca5a5; color: #7f1d1d; }
+    .notice-icon  { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+
+    /* ── フッター ────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 40px 24px;
+      color: var(--muted);
+      font-size: 13px;
+      border-top: 1px solid var(--border);
+      margin-top: 48px;
+    }
+
+    /* ── ナビ ────────────────────────────────────── */
+    .toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 40px;
+    }
+    .toc h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px; }
+    .toc ol  { padding-left: 20px; }
+    .toc li  { margin: 4px 0; }
+    .toc a   { color: var(--primary); text-decoration: none; font-size: 14px; }
+    .toc a:hover { text-decoration: underline; }
+
+    /* ── 区切り ──────────────────────────────────── */
+    hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     ヘッダー
+═══════════════════════════════════════════════ -->
+<header>
+  <div class="inner">
+    <div class="badge">技術概要ドキュメント</div>
+    <h1>MF自動取得パイプライン</h1>
+    <p>MoneyForward ME から入出金明細・口座残高を自動収集し、Notion データベースへリアルタイムに同期するフルマネージド自動化システムです。</p>
+    <div class="meta">
+      <span>バージョン: 1.0</span>
+      <span>作成日: 2026年5月</span>
+      <span>対象: 外部向け説明資料</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrapper">
+
+  <!-- 目次 -->
+  <nav class="toc">
+    <h3>目次</h3>
+    <ol>
+      <li><a href="#overview">システム概要</a></li>
+      <li><a href="#features">主要機能</a></li>
+      <li><a href="#architecture">システムアーキテクチャ</a></li>
+      <li><a href="#flow">処理フロー</a></li>
+      <li><a href="#components">コンポーネント詳細</a></li>
+      <li><a href="#data-model">データモデル</a></li>
+      <li><a href="#security">セキュリティ設計</a></li>
+      <li><a href="#setup">セットアップ要件</a></li>
+      <li><a href="#operation">運用・監視</a></li>
+    </ol>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════
+       1. システム概要
+  ═══════════════════════════════════════════ -->
+  <section id="overview">
+    <h2>1. システム概要</h2>
+    <div class="card">
+      <p>
+        本システムは、個人向け家計簿サービス <strong>MoneyForward ME</strong> から入出金明細・口座残高データを
+        自動スクレイピングし、CSV ファイルの出力および <strong>Notion データベース</strong>への書き込みを
+        ノーコードで実現する自動化パイプラインです。
+      </p>
+      <p>
+        Notion カスタムエージェント（Worker）から自然言語で取得指示を出すと、GitHub Actions 上でヘッドレスブラウザが起動し、
+        30〜90 秒以内にデータ収集・同期を完了します。2 段階認証（OTP）の自動突破にも対応しており、
+        <strong>人手を介さない完全自動運用</strong>が可能です。
+      </p>
+      <div style="margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px;">
+        <span class="tag tag-blue">Python 3.11</span>
+        <span class="tag tag-blue">Playwright</span>
+        <span class="tag tag-green">Notion API</span>
+        <span class="tag tag-green">Notion Worker</span>
+        <span class="tag tag-yellow">GitHub Actions</span>
+        <span class="tag tag-yellow">Google Apps Script</span>
+        <span class="tag tag-gray">TypeScript</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       2. 主要機能
+  ═══════════════════════════════════════════ -->
+  <section id="features">
+    <h2>2. 主要機能</h2>
+    <div class="grid-3">
+      <div class="feature-card">
+        <span class="icon">🤖</span>
+        <strong>自動スクレイピング</strong>
+        <p>Playwright でブラウザを制御し、MoneyForward ME にログインして入出金明細・口座残高を自動取得します。</p>
+      </div>
+      <div class="feature-card">
+        <span class="icon">🔐</span>
+        <strong>OTP 自動突破</strong>
+        <p>Google Apps Script が Gmail からワンタイムパスワードを自動読み取り、2 段階認証を無人で突破します。</p>
+      </div>
+      <div class="feature-card">
+        <span class="icon">💾</span>
+        <strong>セッション永続化</strong>
+        <p>GitHub Actions キャッシュにセッションを保存し、毎回のログインを省略。処理時間を大幅に短縮します。</p>
+      </div>
+      <div class="feature-card">
+        <span class="icon">📅</span>
+        <strong>柔軟な期間指定</strong>
+        <p>今月・先月・今週・先週・指定月・任意期間の 6 モードに対応。Notion エージェントから自然言語で指定可能。</p>
+      </div>
+      <div class="feature-card">
+        <span class="icon">🗄️</span>
+        <strong>Notion Upsert</strong>
+        <p>取引日・金額・口座名をキーに重複チェックを行い、既存レコードは更新、新規は追加する Upsert 処理を実装。</p>
+      </div>
+      <div class="feature-card">
+        <span class="icon">📊</span>
+        <strong>リアルタイム進捗</strong>
+        <p>スクレイピング中の進捗を Notion ジョブ履歴ページへ随時反映。処理状況をリアルタイムで確認できます。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       3. アーキテクチャ
+  ═══════════════════════════════════════════ -->
+  <section id="architecture">
+    <h2>3. システムアーキテクチャ</h2>
+
+    <div class="arch">
+      <pre>
+<span class="c-gray">┌──────────────────────────────────────────────────────────────────────────┐</span>
+<span class="c-gray">│                         MF 自動取得パイプライン                            │</span>
+<span class="c-gray">└──────────────────────────────────────────────────────────────────────────┘</span>
+
+  <span class="c-yellow">【ユーザー操作レイヤー】</span>
+  ┌─────────────────────┐
+  │  Notion カスタム AI  │  ← ユーザーが自然言語で指示
+  │  エージェント (Chat) │     「先月の家計簿を取得して」
+  └──────────┬──────────┘
+             │ Tool Call
+             ▼
+  <span class="c-green">【Notion Worker レイヤー】</span>
+  ┌─────────────────────┐    ┌───────────────────────┐
+  │   Notion Worker     │───▶│ ジョブ実行履歴 DB       │
+  │  (TypeScript)       │    │  状態: 実行中 / 完了    │
+  │  mf-trigger-scraping│    │  取得期間・件数・URL    │
+  └──────────┬──────────┘    └───────────────────────┘
+             │ repository_dispatch
+             │ (GitHub API + GH_PAT)
+             ▼
+  <span class="c-blue">【CI/CD レイヤー】</span>
+  ┌─────────────────────────────────────────────────────┐
+  │            GitHub Actions (ubuntu-latest)            │
+  │                                                      │
+  │  1. Python 3.11 セットアップ                          │
+  │  2. Playwright Chromium インストール                  │
+  │  3. セッションキャッシュ復元 (actions/cache)           │
+  │  4. <span class="c-yellow">scraper/main.py</span> 実行                           │
+  │  5. セッションキャッシュ保存                           │
+  └──────────┬──────────────────────────────────────────┘
+             │
+      ┌──────┴──────┐
+      ▼             ▼
+  <span class="c-cyan">【スクレイパーレイヤー】</span>        <span class="c-pink">【OTP レイヤー (任意)】</span>
+  ┌─────────────────────┐    ┌───────────────────────┐
+  │  mf_scraper.py      │    │  Google Apps Script   │
+  │  (Playwright)       │◀──▶│  Gmail API            │
+  │                     │    │  OTP 6桁コード読み取り  │
+  │  ┌───────────────┐  │    └───────────────────────┘
+  │  │ MoneyForward  │  │
+  │  │  ME (Web)     │  │
+  │  └───────────────┘  │
+  └──────────┬──────────┘
+             │ ScrapingResult
+      ┌──────┴──────┐
+      ▼             ▼
+  <span class="c-green">【出力レイヤー】</span>
+  ┌──────────────┐    ┌────────────────────────────┐
+  │  CSV ファイル │    │  Notion 取引履歴 DB          │
+  │  (UTF-8 BOM) │    │  notion_writer.py (Upsert)  │
+  │  明細 / 残高  │    │  取引日・金額・口座・カテゴリ  │
+  └──────────────┘    └────────────────────────────┘
+      </pre>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       4. 処理フロー
+  ═══════════════════════════════════════════ -->
+  <section id="flow">
+    <h2>4. 処理フロー</h2>
+
+    <h3>4-1. Notion エージェント経由の実行フロー</h3>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="num">1</div>
+        <strong>指示入力</strong>
+        <span>Notion AI チャットから自然言語で取得期間を指定</span>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="num">2</div>
+        <strong>Worker 起動</strong>
+        <span>Notion Worker がジョブページを作成し GitHub API を呼び出す</span>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="num">3</div>
+        <strong>Actions 起動</strong>
+        <span>repository_dispatch により GitHub Actions が即時起動</span>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="num">4</div>
+        <strong>スクレイピング</strong>
+        <span>Playwright でログイン・明細・残高を取得（OTP 自動入力）</span>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="num">5</div>
+        <strong>Notion 同期</strong>
+        <span>取引データを Upsert、ジョブページを「完了」に更新</span>
+      </div>
+    </div>
+
+    <h3 style="margin-top: 32px;">4-2. ジョブ履歴の進捗更新タイミング</h3>
+    <div class="card">
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <strong>Worker 起動直後</strong>
+          <p>状態=実行中、実行モード、取得期間、開始日時 を Notion に記録</p>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <strong>GitHub Actions runner 開始</strong>
+          <p>GitHub 実行 URL、進捗メッセージ、最終更新日時 を更新</p>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <strong>MoneyForward 明細取得中</strong>
+          <p>ページ単位で取引件数をリアルタイム更新（最大 10 ページ）</p>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <strong>口座残高取得後</strong>
+          <p>残高件数を更新</p>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <strong>Notion 書き込み中</strong>
+          <p>処理済み件数・作成件数・更新件数・エラー件数を 5 件ごとに更新</p>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot" style="background: var(--success);"></div>
+          <strong>終了時</strong>
+          <p>状態=完了（またはエラー）、完了日時、エラー詳細 を記録</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       5. コンポーネント詳細
+  ═══════════════════════════════════════════ -->
+  <section id="components">
+    <h2>5. コンポーネント詳細</h2>
+
+    <h3>5-1. Notion Worker（<code>worker/src/index.ts</code>）</h3>
+    <div class="card">
+      <p>Notion のカスタム AI エージェント機能である <strong>Notion Worker</strong> として動作する TypeScript モジュールです。</p>
+      <p>エージェントから <code>mf-trigger-scraping</code> ツールが呼び出されると、以下の 3 ステップを実行します。</p>
+      <ol style="padding-left: 20px; color: #334155; font-size: 14px; line-height: 2;">
+        <li>Notion API でジョブ実行履歴 DB にページを作成（状態: 実行中）</li>
+        <li>GitHub API の <code>repository_dispatch</code> でスクレイピングワークフローを起動</li>
+        <li>ジョブページ ID と「started」ステータスをエージェントへ返答</li>
+      </ol>
+      <div style="margin-top: 12px;">
+        <span class="tag tag-green">取得期間モード: 6 種類</span>
+        <span class="tag tag-blue">入力バリデーション付き</span>
+        <span class="tag tag-gray">TypeScript / @notionhq/workers</span>
+      </div>
+    </div>
+
+    <h3>5-2. MoneyForward スクレイパー（<code>scraper/mf_scraper.py</code>）</h3>
+    <div class="card">
+      <p>Playwright を使ってヘッドレス Chromium ブラウザを操作し、MoneyForward ME からデータを取得するコアモジュールです。</p>
+      <div class="grid-2" style="margin-top: 16px;">
+        <div>
+          <h3 style="font-size: 0.9rem; margin-top: 0;">セッション管理</h3>
+          <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2;">
+            <li>初回ログイン後に <code>session.json</code> へクッキーを保存</li>
+            <li>次回以降はセッションを再利用し、ログインをスキップ</li>
+            <li>セッション切れを自動検知して再ログイン</li>
+          </ul>
+        </div>
+        <div>
+          <h3 style="font-size: 0.9rem; margin-top: 0;">2段階認証（OTP）</h3>
+          <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2;">
+            <li>GAS WebApp に 3 秒間隔で最大 10 回ポーリング</li>
+            <li>6 桁コード取得後に自動入力・送信</li>
+            <li>GAS 未設定時は手動入力にフォールバック</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <h3>5-3. Notion ライター（<code>scraper/notion_writer.py</code>）</h3>
+    <div class="card">
+      <p>取得したトランザクションデータを Notion 取引履歴 DB へ書き込むモジュールです。</p>
+      <div class="grid-2" style="margin-top: 16px;">
+        <div>
+          <h3 style="font-size: 0.9rem; margin-top: 0;">Upsert ロジック</h3>
+          <p style="font-size: 14px;">ユニークキー（<strong>取引日 + 金額 + 口座名</strong>）で既存レコードを検索し、存在する場合は更新、しない場合は新規作成します。</p>
+        </div>
+        <div>
+          <h3 style="font-size: 0.9rem; margin-top: 0;">スキーマ検証</h3>
+          <p style="font-size: 14px;">スクレイピング開始前に Notion DB のアクセス権・必須プロパティ・プロパティ型を自動検証し、不備があれば即座にエラーで停止します。</p>
+        </div>
+      </div>
+      <div class="notice notice-info" style="margin-top: 16px;">
+        <span class="notice-icon">ℹ️</span>
+        <span>Notion API のレート制限（3 req/s）に対応するため、1 件の書き込みごとに 0.4 秒の待機を挿入しています。</span>
+      </div>
+    </div>
+
+    <h3>5-4. GAS OTP リーダー（<code>gas/otp_reader.gs</code>）</h3>
+    <div class="card">
+      <p>Google Apps Script を Gmail に接続し、MoneyForward ID からのメール認証コードを自動取得する Web アプリです。</p>
+      <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2;">
+        <li>直近 10 分以内の MoneyForward ID 認証メールを検索</li>
+        <li>本文から 6 桁のコードを正規表現で抽出</li>
+        <li>取得済みメールを既読にして誤取得を防止</li>
+        <li>シークレットトークンによるアクセス認証</li>
+      </ul>
+    </div>
+
+    <h3>5-5. GitHub Actions ワークフロー（<code>.github/workflows/scrape.yml</code>）</h3>
+    <div class="card">
+      <p>スクレイピング処理を実行する CI/CD パイプラインです。Notion Worker からの <code>repository_dispatch</code> と GitHub UI からの <code>workflow_dispatch</code> の両方をトリガーとして受け付けます。</p>
+      <div class="tbl-wrap" style="margin-top: 12px;">
+        <table>
+          <thead>
+            <tr><th>ステップ</th><th>内容</th><th>備考</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>コードチェックアウト</td><td><code>actions/checkout@v4</code></td><td>GH_PAT で認証</td></tr>
+            <tr><td>Python セットアップ</td><td>Python 3.11 + pip キャッシュ</td><td>依存パッケージ高速化</td></tr>
+            <tr><td>依存インストール</td><td><code>pip install -r requirements.txt</code></td><td>notion-client, playwright 等</td></tr>
+            <tr><td>Playwright セットアップ</td><td>Chromium + OS 依存ライブラリ</td><td>ヘッドレス実行用</td></tr>
+            <tr><td>セッション復元</td><td><code>actions/cache/restore</code></td><td>ログイン省略</td></tr>
+            <tr><td>スクレイピング実行</td><td><code>python scraper/main.py</code></td><td>タイムアウト: 15 分</td></tr>
+            <tr><td>セッション保存</td><td><code>actions/cache/save</code></td><td>常時実行（if: always()）</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       6. データモデル
+  ═══════════════════════════════════════════ -->
+  <section id="data-model">
+    <h2>6. データモデル</h2>
+
+    <h3>6-1. Notion 取引履歴 DB（必須プロパティ）</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>プロパティ名</th><th>型</th><th>説明</th><th>備考</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>メモ</strong></td><td><code>title</code></td><td>取引内容・摘要</td><td>Notion タイトル</td></tr>
+          <tr><td><strong>取引日</strong></td><td><code>date</code></td><td>取引が行われた日付</td><td>Upsert キー①</td></tr>
+          <tr><td><strong>金額</strong></td><td><code>number</code></td><td>収入は正値、支出は負値</td><td>Upsert キー②</td></tr>
+          <tr><td><strong>カテゴリ</strong></td><td><code>select</code></td><td>食費・交通費 等</td><td>MF のカテゴリをそのまま使用</td></tr>
+          <tr><td><strong>サブカテゴリ</strong></td><td><code>select</code></td><td>カテゴリの細分類</td><td></td></tr>
+          <tr><td><strong>口座</strong></td><td><code>select</code></td><td>銀行・クレカ名</td><td>Upsert キー③ / エイリアス正規化あり</td></tr>
+          <tr><td><strong>収支</strong></td><td><code>select</code></td><td>収入 / 支出 / 振替</td><td>金額符号から自動判定</td></tr>
+          <tr><td><strong>スクレイプ日時</strong></td><td><code>date</code></td><td>データ取得時刻</td><td>ISO 8601 UTC</td></tr>
+          <tr><td>ジョブID（任意）</td><td><code>rich_text</code></td><td>ジョブ実行履歴ページとの紐付け</td><td>未作成時はスキップ</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>6-2. ジョブ実行履歴 DB</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>プロパティ名</th><th>型</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>名前</td><td><code>title</code></td><td>「MFスクレイピング YYYY-MM-DD [mode]」形式</td></tr>
+          <tr><td>状態</td><td><code>select</code></td><td>実行中 / 完了 / エラー</td></tr>
+          <tr><td>実行モード</td><td><code>select</code></td><td>current_month / last_month 等</td></tr>
+          <tr><td>取得期間</td><td><code>rich_text</code></td><td>「YYYY-MM-DD 〜 YYYY-MM-DD」形式</td></tr>
+          <tr><td>開始日時 / 完了日時</td><td><code>date</code></td><td>ISO 8601 UTC</td></tr>
+          <tr><td>取引件数 / 残高件数</td><td><code>number</code></td><td>取得データ件数</td></tr>
+          <tr><td>GitHub実行URL</td><td><code>url</code></td><td>Actions 実行ログへのリンク</td></tr>
+          <tr><td>進捗（任意）</td><td><code>rich_text</code></td><td>現在の処理ステージ</td></tr>
+          <tr><td>処理済み/作成/更新/エラー件数（任意）</td><td><code>number</code></td><td>Notion 書き込み詳細</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>6-3. CSV 出力形式</h3>
+    <div class="grid-2">
+      <div>
+        <p style="font-size: 14px; font-weight: 600; margin-bottom: 6px;">取引明細 CSV（<code>transactions_YYYYMMDD_YYYYMMDD.csv</code>）</p>
+        <div class="code-block">
+          <pre><span class="comment"># UTF-8 BOM / Excel 対応</span>
+<span class="str">取引日,金額,カテゴリ,サブカテゴリ,口座,メモ</span>
+<span class="val">2026-05-01,-3500,食費,外食,ANAカード,ランチ</span>
+<span class="val">2026-05-02,250000,収入,給与,三菱UFJ,5月給与</span></pre>
+        </div>
+      </div>
+      <div>
+        <p style="font-size: 14px; font-weight: 600; margin-bottom: 6px;">口座残高 CSV（<code>balances_YYYYMMDD_YYYYMMDD.csv</code>）</p>
+        <div class="code-block">
+          <pre><span class="comment"># UTF-8 BOM / Excel 対応</span>
+<span class="str">口座名,残高,更新日時</span>
+<span class="val">三菱UFJ銀行,1250000,2026/05/27 10:30</span>
+<span class="val">ANAカード,-45000,2026/05/27 10:30</span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       7. セキュリティ設計
+  ═══════════════════════════════════════════ -->
+  <section id="security">
+    <h2>7. セキュリティ設計</h2>
+
+    <div class="notice notice-danger">
+      <span class="notice-icon">🔒</span>
+      <span><strong>重要:</strong> MoneyForward のログイン情報・Notion トークン・GitHub PAT はすべて GitHub Secrets で管理し、コードベースには一切含まれません。</span>
+    </div>
+
+    <div class="grid-2" style="margin-top: 16px;">
+      <div class="card">
+        <h3 style="margin-top: 0;">認証情報の管理</h3>
+        <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2;">
+          <li><code>.env</code> と <code>session.json</code> は <code>.gitignore</code> で除外済み</li>
+          <li>GitHub Actions では Secrets として注入（ログに出力されない）</li>
+          <li>GAS には <code>SECRET</code> トークンによるアクセス認証を実装</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top: 0;">権限の最小化</h3>
+        <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2;">
+          <li>Actions ジョブの権限は <code>contents: read</code> のみ</li>
+          <li>Notion Integration は必要な DB のみに共有</li>
+          <li>GAS は Gmail 読み取り権限のみ使用</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="notice notice-warn" style="margin-top: 16px;">
+      <span class="notice-icon">⚠️</span>
+      <span>本システムは MoneyForward ME の個人利用を対象として設計されています。利用にあたっては MoneyForward ME の利用規約を遵守してください。</span>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       8. セットアップ要件
+  ═══════════════════════════════════════════ -->
+  <section id="setup">
+    <h2>8. セットアップ要件</h2>
+
+    <h3>必須の外部サービス・アカウント</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>サービス</th><th>用途</th><th>必要な権限</th><th>必須/任意</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>MoneyForward ME</td>
+            <td>家計簿データの取得元</td>
+            <td>ログインアカウント（メール・パスワード）</td>
+            <td><span class="tag tag-red">必須</span></td>
+          </tr>
+          <tr>
+            <td>GitHub</td>
+            <td>Actions でのスクレイピング実行</td>
+            <td>Personal Access Token（workflow スコープ）</td>
+            <td><span class="tag tag-red">必須</span></td>
+          </tr>
+          <tr>
+            <td>Notion</td>
+            <td>データ保存・ジョブ管理・AI エージェント</td>
+            <td>Integration Token（DB へのアクセス権）</td>
+            <td><span class="tag tag-red">必須</span></td>
+          </tr>
+          <tr>
+            <td>Google Apps Script</td>
+            <td>Gmail OTP の自動読み取り</td>
+            <td>Gmail API（Gmail アカウント）</td>
+            <td><span class="tag tag-yellow">任意</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>環境変数一覧</h3>
+    <div class="code-block">
+      <pre><span class="comment"># ── MoneyForward ME ログイン情報（必須）──────────────────────</span>
+<span class="key">MF_EMAIL</span>=<span class="str">your_email@example.com</span>
+<span class="key">MF_PASSWORD</span>=<span class="str">your_password</span>
+
+<span class="comment"># ── Notion（必須：Notion DB への書き込みを行う場合）───────────</span>
+<span class="key">NOTION_TOKEN</span>=<span class="str">secret_xxxxxxxxxxxxxxxxxxxx</span>   <span class="comment"># Notion Integration Token</span>
+<span class="key">NOTION_DB_ID</span>=<span class="str">xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</span>  <span class="comment"># 取引履歴 DB の ID</span>
+<span class="key">MF_JOB_DB_ID</span>=<span class="str">xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</span>  <span class="comment"># ジョブ実行履歴 DB の ID</span>
+
+<span class="comment"># ── GitHub Actions 制御（Notion Worker 経由で使用）────────────</span>
+<span class="key">GH_PAT</span>=<span class="str">ghp_xxxxxxxxxxxxxxxxxxxx</span>   <span class="comment"># Personal Access Token</span>
+<span class="key">GH_REPO</span>=<span class="str">owner/repo-name</span>           <span class="comment"># リポジトリ名（デフォルト: Haruki1090/mf-automation）</span>
+
+<span class="comment"># ── GAS OTP 自動取得（任意）───────────────────────────────────</span>
+<span class="key">GAS_OTP_URL</span>=<span class="str">https://script.google.com/macros/s/XXXXXXXXXX/exec</span>
+<span class="key">GAS_OTP_SECRET</span>=<span class="str">your_secret_token</span></pre>
+    </div>
+
+    <h3>ファイル構成</h3>
+    <div class="code-block">
+      <pre><span class="comment">mf-automation/</span>
+<span class="c-blue">├── .env.example</span>              <span class="comment"># 環境変数テンプレート</span>
+<span class="c-blue">├── Makefile</span>                  <span class="comment"># ローカル操作コマンド集</span>
+<span class="c-blue">├── requirements.txt</span>          <span class="comment"># Python 依存パッケージ</span>
+<span class="c-green">├── gas/</span>
+<span class="c-green">│   ├── appsscript.json</span>       <span class="comment"># GAS マニフェスト</span>
+<span class="c-green">│   └── otp_reader.gs</span>         <span class="comment"># OTP 取得スクリプト</span>
+<span class="c-yellow">├── scraper/</span>
+<span class="c-yellow">│   ├── main.py</span>               <span class="comment"># CLI エントリポイント</span>
+<span class="c-yellow">│   ├── mf_scraper.py</span>         <span class="comment"># スクレイパー本体（Playwright）</span>
+<span class="c-yellow">│   ├── notion_writer.py</span>      <span class="comment"># Notion Upsert モジュール</span>
+<span class="c-yellow">│   └── tests/</span>                <span class="comment"># ユニット / 統合テスト</span>
+<span class="c-pink">├── worker/</span>
+<span class="c-pink">│   └── src/index.ts</span>          <span class="comment"># Notion Worker（TypeScript）</span>
+<span class="c-blue">└── .github/workflows/</span>
+<span class="c-blue">    └── scrape.yml</span>             <span class="comment"># GitHub Actions パイプライン</span></pre>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════
+       9. 運用・監視
+  ═══════════════════════════════════════════ -->
+  <section id="operation">
+    <h2>9. 運用・監視</h2>
+
+    <h3>実行モード一覧</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>モード</th><th>説明</th><th>追加パラメータ</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>current_month</code>（デフォルト）</td><td>今月 1 日〜今日</td><td>不要</td></tr>
+          <tr><td><code>last_month</code></td><td>先月 1 日〜末日</td><td>不要</td></tr>
+          <tr><td><code>this_week</code></td><td>今週月曜〜今日</td><td>不要</td></tr>
+          <tr><td><code>last_week</code></td><td>先週月曜〜日曜</td><td>不要</td></tr>
+          <tr><td><code>month</code></td><td>任意の月</td><td><code>month: YYYY-MM</code></td></tr>
+          <tr><td><code>range</code></td><td>任意の期間</td><td><code>from_date: YYYY-MM-DD</code> / <code>to_date: YYYY-MM-DD</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>テスト構成</h3>
+    <div class="grid-2">
+      <div class="card">
+        <h3 style="margin-top: 0; font-size: 0.95rem;">ユニットテスト（37 件）</h3>
+        <p style="font-size: 14px;">日付範囲ロジック・金額パース・日付パース・Notion スキーマ処理をブラウザ不要で検証。<br><code>make test</code> で実行。</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top: 0; font-size: 0.95rem;">統合シナリオテスト（5 種）</h3>
+        <p style="font-size: 14px;">実ブラウザ・実アカウントを使用した End-to-End テスト。<code>make scenario</code> で実行。S03（手動 OTP フォールバック）は手動実行のみ。</p>
+      </div>
+    </div>
+
+    <h3>エラー時の挙動</h3>
+    <div class="card">
+      <ul style="padding-left: 18px; font-size: 14px; color: #334155; line-height: 2.2;">
+        <li>スクレイピング中に例外が発生した場合、Notion ジョブページの状態を <strong>「エラー」</strong> に更新し、エラー詳細（最大 2000 文字）を記録します。</li>
+        <li>Notion DB のスキーマ不備（必須プロパティ欠落・型不一致）はスクレイピング開始前に検出し、即座にエラーで停止します。</li>
+        <li>GitHub Actions の実行ログ URL がジョブページに記録されるため、失敗時のデバッグが容易です。</li>
+        <li>GitHub Actions のタイムアウトは <strong>15 分</strong> に設定されています。</li>
+        <li>任意プロパティ（ジョブ ID・進捗等）が Notion DB に未作成の場合、警告を出力してスキップし、処理は継続します。</li>
+      </ul>
+    </div>
+
+    <div class="notice notice-info" style="margin-top: 16px;">
+      <span class="notice-icon">💡</span>
+      <span>MoneyForward のページ構造（HTML セレクタ）が変更された場合は、<code>scraper/mf_scraper.py</code> 内のセレクタ定義を更新する必要があります。</span>
+    </div>
+  </section>
+
+</div>
+
+<!-- フッター -->
+<footer>
+  <p>MF自動取得パイプライン — 技術概要ドキュメント</p>
+  <p style="margin-top: 4px;">作成日: 2026年5月 &nbsp;|&nbsp; 本資料は外部向け説明用です</p>
+</footer>
+
+</body>
+</html>
